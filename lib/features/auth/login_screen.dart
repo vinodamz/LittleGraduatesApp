@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/api_client.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
+import '../../core/privacy.dart';
 
 class _LoginUser {
   _LoginUser(this.id, this.name, this.role);
@@ -12,8 +13,12 @@ class _LoginUser {
   final String name;
   final String role;
 
-  String get initials =>
-      name.trim().split(RegExp(r'\s+')).take(2).map((w) => w.isEmpty ? '' : w[0].toUpperCase()).join();
+  String get initials => name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .take(2)
+      .map((w) => w.isEmpty ? '' : w[0].toUpperCase())
+      .join();
 }
 
 /// Same flow as the website: tap your name, enter your PIN.
@@ -43,7 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _school = (d['school'] as String?) ?? _school;
         _users = [
           for (final u in d['users'] as List)
-            _LoginUser(u['id'] as int, u['name'] as String, u['role'] as String),
+            _LoginUser(
+              u['id'] as int,
+              u['name'] as String,
+              u['role'] as String,
+            ),
         ];
       });
     } on ApiException catch (e) {
@@ -60,16 +69,32 @@ class _LoginScreenState extends State<LoginScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
             children: [
-              Text(_school, style: const TextStyle(color: LgColors.accent, fontWeight: FontWeight.w700)),
+              Text(
+                _school,
+                style: const TextStyle(
+                  color: LgColors.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Who’s here?', style: Theme.of(context).textTheme.headlineMedium),
-              const Text('Tap your name to sign in.', style: TextStyle(color: LgColors.muted)),
+              Text(
+                'Who’s here?',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const Text(
+                'Tap your name to sign in.',
+                style: TextStyle(color: LgColors.muted),
+              ),
+              const PrivacyPolicyButton(),
               const SizedBox(height: 20),
               if (_error != null) ...[
                 Text(_error!, style: const TextStyle(color: Colors.red)),
                 TextButton(onPressed: _load, child: const Text('Try again')),
               ] else if (_users == null)
-                const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else
                 for (final u in _users!)
                   Card(
@@ -77,7 +102,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: ListTile(
                       leading: CircleAvatar(
                         backgroundColor: LgColors.warnBg,
-                        child: Text(u.initials, style: const TextStyle(color: LgColors.warn)),
+                        child: Text(
+                          u.initials,
+                          style: const TextStyle(color: LgColors.warn),
+                        ),
                       ),
                       title: Text(u.name),
                       subtitle: Text(u.role == 'admin' ? 'Admin' : 'Staff'),
@@ -148,7 +176,10 @@ class _PinScreenState extends State<_PinScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const Text('Enter your PIN', style: TextStyle(color: LgColors.muted)),
+              const Text(
+                'Enter your PIN',
+                style: TextStyle(color: LgColors.muted),
+              ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -160,7 +191,9 @@ class _PinScreenState extends State<_PinScreen> {
                       height: 16,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: i < _pin.length ? LgColors.accent : LgColors.line,
+                        color: i < _pin.length
+                            ? LgColors.accent
+                            : LgColors.line,
                       ),
                     ),
                 ],
@@ -169,8 +202,15 @@ class _PinScreenState extends State<_PinScreen> {
                 height: 40,
                 child: Center(
                   child: _busy
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_error ?? '', style: const TextStyle(color: Colors.red)),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          _error ?? '',
+                          style: const TextStyle(color: Colors.red),
+                        ),
                 ),
               ),
               Expanded(
@@ -183,10 +223,16 @@ class _PinScreenState extends State<_PinScreen> {
                   children: [
                     for (final k in keys)
                       k == 'OK'
-                          ? FilledButton(onPressed: _pin.length >= 4 ? _submit : null, child: const Text('OK'))
+                          ? FilledButton(
+                              onPressed: _pin.length >= 4 ? _submit : null,
+                              child: const Text('OK'),
+                            )
                           : OutlinedButton(
                               onPressed: () => _tap(k),
-                              child: Text(k, style: const TextStyle(fontSize: 22)),
+                              child: Text(
+                                k,
+                                style: const TextStyle(fontSize: 22),
+                              ),
                             ),
                   ],
                 ),
