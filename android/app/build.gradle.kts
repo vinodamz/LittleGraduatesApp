@@ -46,9 +46,20 @@ android {
     buildTypes {
         release {
             // android/key.properties (gitignored) points at the release keystore.
-            // Without it, release builds fall back to debug signing.
-            signingConfig = if (keystoreProperties.isNotEmpty()) signingConfigs.getByName("release")
-                            else signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.project == project && it.name.contains("Release") }) {
+        listOf("storeFile", "storePassword", "keyAlias", "keyPassword").forEach {
+            require(!keystoreProperties.getProperty(it).isNullOrBlank()) {
+                "Release signing requires '$it' in android/key.properties. See docs/android-publishing.md."
+            }
+        }
+        require(file(keystoreProperties.getProperty("storeFile")).isFile) {
+            "Release upload keystore does not exist."
         }
     }
 }

@@ -1,0 +1,36 @@
+name: Promote Android to production
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: Existing version code tested on the internal track
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: google-play-release
+  cancel-in-progress: false
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: google-play-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Require production environment protection
+        env:
+          GH_TOKEN: ${{ secrets.ENVIRONMENT_READ_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo 'Configure ENVIRONMENT_READ_TOKEN with read access to repository environments.'; exit 1; }
+          gh api "repos/$GH_REPO/environments/google-play-production" --jq '.protection_rules' > "$RUNNER_TEMP/protection.json"
+          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert any(x.get("type")=="required_reviewers" and x.get("reviewers") for x in r), "Production requires at least one environment reviewer"' "$RUNNER_TEMP/protection.json"
+      - run: python3 -m pip install -r scripts/requirements-play.txt
+      - name: Promote tested version
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: python3 scripts/play_release.py promote --version-code "$VERSION_CODE"

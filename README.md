@@ -66,3 +66,11 @@ flutter run --dart-define=LG_BASE_URL=http://10.0.2.2:8765
 Release builds are signed with the key referenced by `android/key.properties` (gitignored). The keystore and its password live outside the repo in `~/.lg-android-keys/`.
 
 **Back up that folder somewhere safe.** Every future update must be signed with the same key; if it is lost, phones have to uninstall and reinstall the app.
+
+## Google Play CI/CD
+
+GitHub Actions checks PRs and main pushes. Version tags build a signed App Bundle
+and publish to internal testing; a protected manual workflow promotes tested
+versions to production. Release builds require the existing signing key.
+See [Android publishing setup](docs/android-publishing.md) for secrets, Play API
+permissions, first-upload setup, and release instructions.

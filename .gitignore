@@ -32,6 +32,10 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+*.jks
+*.keystore
+play-service-account*.json
+__pycache__/
 
 # Symbolication related
 app.*.symbols
