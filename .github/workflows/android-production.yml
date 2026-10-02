@@ -21,13 +21,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Require production environment protection
         env:
-          GH_TOKEN: ${{ secrets.ENVIRONMENT_READ_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          test -n "$GH_TOKEN" || { echo 'Configure ENVIRONMENT_READ_TOKEN with read access to repository environments.'; exit 1; }
-          gh api "repos/$GH_REPO/environments/google-play-production" --jq '.protection_rules' > "$RUNNER_TEMP/protection.json"
-          python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); assert any(x.get("type")=="required_reviewers" and x.get("reviewers") for x in r), "Production requires at least one environment reviewer"' "$RUNNER_TEMP/protection.json"
+          curl --fail --silent --show-error "https://api.github.com/repos/$GH_REPO/environments/google-play-production" > "$RUNNER_TEMP/protection.json"
+          python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); r=e.get("protection_rules", []); assert e.get("can_admins_bypass") is False, "Administrator bypass must be disabled"; assert any(x.get("type")=="required_reviewers" and x.get("reviewers") for x in r), "Production requires at least one environment reviewer"' "$RUNNER_TEMP/protection.json"
       - run: python3 -m pip install -r scripts/requirements-play.txt
       - name: Promote tested version
         env:

@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../core/module_registry.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
+import '../../core/privacy.dart';
 import '../transport/location_tracker.dart';
 
 /// One tile per MTT module the user has. Native modules open in the app;
@@ -23,12 +24,19 @@ class HomeScreen extends StatelessWidget {
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) async {
+              if (v == 'privacy') {
+                await openPrivacyPolicy(context);
+                return;
+              }
               if (v == 'out') {
                 await context.read<LocationTracker>().stop();
                 if (context.mounted) await context.read<Session>().signOut();
               }
             },
-            itemBuilder: (_) => const [PopupMenuItem(value: 'out', child: Text('Sign out'))],
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'privacy', child: Text('Privacy policy')),
+              PopupMenuItem(value: 'out', child: Text('Sign out')),
+            ],
           ),
         ],
       ),
@@ -38,7 +46,9 @@ class HomeScreen extends StatelessWidget {
             await session.refresh();
           } on ApiException catch (e) {
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(e.message)));
             }
           }
         },
@@ -47,8 +57,10 @@ class HomeScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: Text(user == null ? '' : 'Hello, ${user.name.split(' ').first}',
-                  style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                user == null ? '' : 'Hello, ${user.name.split(' ').first}',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
             if (tracker.active)
               Card(
@@ -62,8 +74,10 @@ class HomeScreen extends StatelessWidget {
             if (session.modules.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
-                child: Text('No modules are turned on for your login yet. Ask the school admin.',
-                    style: TextStyle(color: LgColors.muted)),
+                child: Text(
+                  'No modules are turned on for your login yet. Ask the school admin.',
+                  style: TextStyle(color: LgColors.muted),
+                ),
               ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -85,13 +99,29 @@ class HomeScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(moduleIcons[m.key] ?? Icons.apps_rounded, color: LgColors.accent, size: 30),
+                              Icon(
+                                moduleIcons[m.key] ?? Icons.apps_rounded,
+                                color: LgColors.accent,
+                                size: 30,
+                              ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(m.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                                  Text(
+                                    m.label,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
                                   if (!m.native)
-                                    const Text('Opens website', style: TextStyle(color: LgColors.muted, fontSize: 12)),
+                                    const Text(
+                                      'Opens website',
+                                      style: TextStyle(
+                                        color: LgColors.muted,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],
