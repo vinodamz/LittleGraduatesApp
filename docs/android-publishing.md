@@ -31,9 +31,8 @@ Package: `in.thelittlegraduates.app`. CI uses Flutter 3.44.8 (Dart 3.12.2) and J
 
    Add `PLAY_SERVICE_ACCOUNT_JSON` to `google-play-production` as well. Prefer
    separate service accounts for testing and production permissions.
-   Production also needs `ENVIRONMENT_READ_TOKEN`: a fine-grained GitHub token
-   restricted to this repository with Actions read permission (environment
-   inspection). It is used only to check that production has required reviewers.
+   The public repository allows production to verify environment protection using
+   GitHub public metadata, without an additional GitHub access token.
    Never commit these values. Release jobs clean signing files even on failure.
 6. Google Play API publishing needs an existing app and may require a first
    manual bundle upload. To bootstrap, run Android internal release manually
