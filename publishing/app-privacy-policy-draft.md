@@ -18,7 +18,7 @@ Authorized school staff can access information permitted by their account. Famil
 
 ## Retention and deletion
 
-Driver location and trip records are retained for one year. Users can request deletion by emailing info@thelittlegraduates.in. Include the account or trip information needed to identify the records. The school will verify the request before deleting records.
+Driver location and trip records are retained for one year. Users can request deletion by emailing info@thelittlegraduates.in. Include the account or trip information needed to identify the records. The school processes deletion requests manually and deletes the requested records promptly after verifying the request.
 
 ## Advertising and permissions
 
@@ -31,4 +31,4 @@ Email: info@thelittlegraduates.in
 
 ## Confirm before publication
 
-Confirm retention rules for staff accounts, child/parent records, server logs and backups; identify hosting/service providers; confirm deletion processing and any required exceptions. Confirm that every linked MTT module is covered. This draft must be published at the supplied privacy-policy URL before public app submission.
+Confirm retention rules for staff accounts, child/parent records, server logs and backups; identify hosting/service providers; confirm the deletion contact address and any required exceptions. Confirm that every linked MTT module is covered. This draft must be published at the supplied privacy-policy URL before public app submission.
