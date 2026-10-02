@@ -1,0 +1,13 @@
+App: Little Graduates
+Package: in.thelittlegraduates.app
+Short description: Staff tools and school transport tracking for Little Graduates.
+
+Little Graduates helps authorized school staff and transport drivers access their daily work tools.
+
+Sign in with your existing Little Graduates staff name and PIN to see the modules available to your account.
+
+Transport drivers can view scheduled pickup and drop trips, start and finish trips, and mark children as picked up, dropped off, or absent. During an active trip, the app shares the vehicle location with the school transport system so families can follow their child’s cab through their private tracking link. Location tracking continues while the screen is off and stops when the trip is finished or cancelled.
+
+Other staff modules open the corresponding Little Graduates MTT web pages.
+
+This app requires an account provided by Little Graduates. Location permissions are needed for driver trip tracking.
