@@ -9,6 +9,7 @@ import '../../core/config.dart';
 import '../../core/notifications.dart';
 import '../../core/privacy.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import 'location_tracker.dart';
 import 'transport_api.dart';
 
@@ -142,118 +143,172 @@ class _TripScreenState extends State<TripScreen> {
       ) ??
       false;
 
+  Future<void> _finish() async {
+    final n = _trip.pendingCount;
+    if (n == 0 || await _confirm('$n ${n == 1 ? 'child is' : 'children are'} not marked yet. Finish anyway?')) {
+      await _act('finish');
+    }
+  }
+
+  Future<void> _cancel() async {
+    if (await _confirm('Cancel this trip for today?')) await _act('cancel');
+  }
+
   @override
   Widget build(BuildContext context) {
     final tracker = context.watch<LocationTracker>();
-    final dueCount = _trip.stops
-        .where((s) => s.etaAlertDue && s.parents.isNotEmpty)
-        .length;
+    final dueCount = _trip.stops.where((s) => s.etaAlertDue && s.parents.isNotEmpty).length;
+    final nextId = _trip.stops.where((s) => s.pending).map((s) => s.id).firstOrNull;
+    final done = _trip.stops.where((s) => !s.pending).length;
     return Scaffold(
       appBar: AppBar(title: Text(_trip.routeName)),
       body: RefreshIndicator(
         onRefresh: _reload,
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 32),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                [
-                  _trip.directionLabel,
-                  if (_trip.cabName.isNotEmpty) _trip.cabName,
-                  if (_trip.vehicleNo.isNotEmpty) _trip.vehicleNo,
-                ].join(' · '),
-                style: const TextStyle(color: LgColors.muted),
-              ),
+            Text(
+              [
+                _trip.directionLabel,
+                if (_trip.cabName.isNotEmpty) _trip.cabName,
+                if (_trip.vehicleNo.isNotEmpty) _trip.vehicleNo,
+              ].join(' · '),
+              style: const TextStyle(color: LgColors.muted),
             ),
-            _TrackingBanner(
-              trip: _trip,
-              tracker: tracker,
-              onRetry: _startTracking,
-            ),
-            if (_trip.scheduled)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        '${_trip.stops.length} children in this order. Start when the cab leaves.',
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton.icon(
-                        onPressed: _busy || _trip.stops.isEmpty
-                            ? null
-                            : () => _act('start'),
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Start trip'),
-                      ),
-                    ],
-                  ),
-                ),
+            const SizedBox(height: 12),
+            _ProgressCard(trip: _trip, done: done),
+            const SizedBox(height: 12),
+            _TrackingBanner(trip: _trip, tracker: tracker, onRetry: _startTracking),
+            if (_trip.scheduled) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${_trip.stops.length} ${_trip.stops.length == 1 ? 'child' : 'children'} in this order. Start when the cab leaves.',
+                style: const TextStyle(height: 1.4),
               ),
-            if (_trip.running && dueCount > 0)
-              Card(
-                color: LgColors.warnBg,
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Text(
-                    '${dueCount == 1 ? 'A family is' : '$dueCount families are'} about 5 minutes away — '
-                    'tap the highlighted WhatsApp button.',
-                    style: const TextStyle(color: LgColors.warn),
-                  ),
-                ),
+            ],
+            if (_trip.running && dueCount > 0) ...[
+              const SizedBox(height: 12),
+              LgNotice(
+                message: dueCount == 1
+                    ? 'A family is about 5 minutes away. Send the highlighted WhatsApp message.'
+                    : '$dueCount families are about 5 minutes away. Send the highlighted WhatsApp messages.',
+                foreground: LgColors.warn,
+                background: LgColors.warnBg,
+                icon: Icons.schedule_rounded,
               ),
-            for (final s in _trip.stops)
+            ],
+            const SizedBox(height: 8),
+            for (final s in _trip.stops) ...[
+              const SizedBox(height: 10),
               _StopCard(
                 stop: s,
                 trip: _trip,
+                next: s.id == nextId,
                 busy: _busyStop == s.id,
                 onAction: (op) => _act(op, stopId: s.id),
                 onWhatsApp: (kind, p) => _whatsApp(s, kind, p),
               ),
-            if (_trip.running || _trip.scheduled)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  children: [
-                    if (_trip.running)
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _busy
-                              ? null
-                              : () async {
-                                  final n = _trip.pendingCount;
-                                  if (n == 0 ||
-                                      await _confirm(
-                                        '$n children are not marked yet. Finish anyway?',
-                                      )) {
-                                    await _act('finish');
-                                  }
-                                },
-                          child: const Text('Finish trip'),
-                        ),
-                      ),
-                    if (_trip.running) const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _busy
-                            ? null
-                            : () async {
-                                if (await _confirm(
-                                  'Cancel this trip for today?',
-                                )) {
-                                  await _act('cancel');
-                                }
-                              },
-                        child: const Text('Cancel trip'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            ],
           ],
+        ),
+      ),
+      bottomNavigationBar: _trip.running || _trip.scheduled
+          ? _TripActions(
+              trip: _trip,
+              busy: _busy,
+              onStart: () => _act('start'),
+              onFinish: _finish,
+              onCancel: _cancel,
+            )
+          : null,
+    );
+  }
+}
+
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({required this.trip, required this.done});
+
+  final Trip trip;
+  final int done;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = trip.stops.length;
+    final value = total == 0 ? 0.0 : done / total;
+    final verb = trip.direction == 'drop' ? 'dropped' : 'picked up';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              total == 0 ? 'No children on this run' : '$done of $total $verb',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: value,
+                minHeight: 8,
+                backgroundColor: const Color(0xFFF3EEE8),
+                color: trip.running ? LgColors.warn : LgColors.ok,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TripActions extends StatelessWidget {
+  const _TripActions({
+    required this.trip,
+    required this.busy,
+    required this.onStart,
+    required this.onFinish,
+    required this.onCancel,
+  });
+
+  final Trip trip;
+  final bool busy;
+  final VoidCallback onStart;
+  final VoidCallback onFinish;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: LgColors.surface,
+        border: Border(top: BorderSide(color: LgColors.line)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (trip.scheduled)
+                FilledButton.icon(
+                  onPressed: busy || trip.stops.isEmpty ? null : onStart,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Start trip'),
+                ),
+              if (trip.running)
+                FilledButton(
+                  onPressed: busy ? null : onFinish,
+                  child: const Text('Finish trip'),
+                ),
+              TextButton(
+                onPressed: busy ? null : onCancel,
+                child: const Text('Cancel trip'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -277,47 +332,50 @@ class _TrackingBanner extends StatelessWidget {
     final mine = tracker.tripId == trip.id;
     final String text;
     final Color color;
+    final Color background;
+    final IconData icon;
     if (!mine) {
       text = tracker.problem ?? 'Location is not being shared from this phone.';
-      color = Colors.red;
+      color = LgColors.danger;
+      background = LgColors.dangerBg;
+      icon = Icons.location_off_rounded;
     } else if (tracker.problem != null) {
       text = tracker.problem!;
       color = LgColors.warn;
+      background = LgColors.warnBg;
+      icon = Icons.my_location_rounded;
     } else if (tracker.lastUploadAt != null) {
       final t = TimeOfDay.fromDateTime(tracker.lastUploadAt!).format(context);
       text = 'Sharing cab location · last sent $t';
       color = LgColors.ok;
+      background = LgColors.okBg;
+      icon = Icons.my_location_rounded;
     } else {
       text = 'Finding location…';
       color = LgColors.muted;
+      background = const Color(0xFFF3EEE8);
+      icon = Icons.my_location_rounded;
     }
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(
-              mine ? Icons.my_location : Icons.location_disabled,
-              color: color,
-            ),
-            title: Text(text, style: TextStyle(color: color, fontSize: 14)),
-            trailing: mine
-                ? null
-                : TextButton(onPressed: onRetry, child: const Text('Share')),
-          ),
-          if (mine && !tracker.alwaysAllowed)
-            ListTile(
-              dense: true,
-              title: const Text(
-                'For screen-off tracking, set Location to “Allow all the time”.',
-                style: TextStyle(fontSize: 13, color: LgColors.muted),
-              ),
-              trailing: TextButton(
-                onPressed: tracker.openLocationSettings,
-                child: const Text('Settings'),
-              ),
-            ),
+    return Column(
+      children: [
+        LgNotice(message: text, foreground: color, background: background, icon: icon),
+        if (!mine) ...[
+          const SizedBox(height: 8),
+          FilledButton(onPressed: onRetry, child: const Text('Share location')),
         ],
-      ),
+        if (mine && !tracker.alwaysAllowed) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: tracker.openLocationSettings,
+            child: const Text('Allow location all the time'),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'That keeps the cab on the map when the screen is off.',
+            style: TextStyle(color: LgColors.muted, fontSize: 13),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -326,6 +384,7 @@ class _StopCard extends StatelessWidget {
   const _StopCard({
     required this.stop,
     required this.trip,
+    required this.next,
     required this.busy,
     required this.onAction,
     required this.onWhatsApp,
@@ -333,6 +392,7 @@ class _StopCard extends StatelessWidget {
 
   final TripStop stop;
   final Trip trip;
+  final bool next;
   final bool busy;
   final void Function(String op) onAction;
   final void Function(String kind, StopParent p) onWhatsApp;
@@ -341,122 +401,107 @@ class _StopCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = stop;
     final due = s.etaAlertDue && s.parents.isNotEmpty;
+    final border = due || next ? LgColors.warn : LgColors.line;
     return Card(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: due ? LgColors.warn : LgColors.line,
-          width: due ? 2 : 1,
-        ),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: border, width: due || next ? 2 : 1),
       ),
-      child: Opacity(
-        opacity: s.pending ? 1 : 0.7,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${s.order}. ${s.name}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          [s.grade, if (s.note.isNotEmpty) s.note].join(' · '),
-                          style: const TextStyle(
-                            color: LgColors.muted,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _stateChip(context),
-                ],
-              ),
-              if (trip.running && s.pending) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (!s.reached)
-                      OutlinedButton(
-                        onPressed: busy ? null : () => onAction('reached'),
-                        child: const Text('Reached stop'),
-                      ),
-                    FilledButton(
-                      onPressed: busy ? null : () => onAction('done'),
-                      child: Text(trip.doneVerb),
-                    ),
-                    OutlinedButton(
-                      onPressed: busy ? null : () => onAction('absent'),
-                      child: const Text('Absent'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (s.parents.isEmpty)
-                  const Text(
-                    'No parent phone on file.',
-                    style: TextStyle(color: LgColors.muted, fontSize: 13),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final p in s.parents) ...[
-                        if (!s.reached)
-                          _waButton(
-                            '${p.label}: 5 min',
-                            highlight: due,
-                            onTap: () => onWhatsApp('eta', p),
-                          ),
-                        _waButton(
-                          '${p.label}: cab reached',
-                          highlight: s.reached && !s.reachedAlertSent,
-                          onTap: () => onWhatsApp('reached', p),
+                      if (next)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 4),
+                          child: Text('Next stop', style: TextStyle(color: LgColors.warn, fontWeight: FontWeight.w700, fontSize: 12)),
                         ),
-                      ],
+                      Text(
+                        '${s.order}. ${s.name}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                          color: s.pending ? LgColors.ink : LgColors.muted,
+                        ),
+                      ),
+                      Text(
+                        [s.grade, if (s.note.isNotEmpty) s.note].where((part) => part.isNotEmpty).join(' · '),
+                        style: const TextStyle(color: LgColors.muted, fontSize: 13),
+                      ),
                     ],
                   ),
-                if (s.etaAlertSent || s.reachedAlertSent)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      [
-                        if (s.etaAlertSent) '5-min alert opened',
-                        if (s.reachedAlertSent) 'reached alert opened',
-                      ].join(' · '),
-                      style: const TextStyle(
-                        color: LgColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-              ] else if (trip.running)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: busy ? null : () => onAction('undo'),
-                    child: const Text('Undo'),
-                  ),
                 ),
-            ],
-          ),
+                _stateChip(context),
+              ],
+            ),
+            if (trip.running && s.pending) ...[
+              const SizedBox(height: 12),
+              if (!s.reached)
+                OutlinedButton(
+                  onPressed: busy ? null : () => onAction('reached'),
+                  child: const Text('Reached stop'),
+                ),
+              if (!s.reached) const SizedBox(height: 8),
+              FilledButton(
+                onPressed: busy ? null : () => onAction('done'),
+                child: Text(trip.doneVerb),
+              ),
+              TextButton(
+                onPressed: busy ? null : () => onAction('absent'),
+                child: const Text('Mark absent'),
+              ),
+              if (s.parents.isEmpty)
+                const Text('No parent phone on file.', style: TextStyle(color: LgColors.muted, fontSize: 13))
+              else ...[
+                const Text('Message family', style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                for (final p in s.parents) ...[
+                  if (!s.reached) ...[
+                    _waButton('${_parentLabel(p)}: 5 min away', highlight: due, onTap: () => onWhatsApp('eta', p)),
+                    const SizedBox(height: 8),
+                  ],
+                  _waButton(
+                    '${_parentLabel(p)}: cab reached',
+                    highlight: s.reached && !s.reachedAlertSent,
+                    onTap: () => onWhatsApp('reached', p),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+              if (s.etaAlertSent || s.reachedAlertSent)
+                Text(
+                  [
+                    if (s.etaAlertSent) '5-min alert opened',
+                    if (s.reachedAlertSent) 'Reached alert opened',
+                  ].join(' · '),
+                  style: const TextStyle(color: LgColors.muted, fontSize: 12),
+                ),
+            ] else if (trip.running)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: busy ? null : () => onAction('undo'),
+                  child: const Text('Undo'),
+                ),
+              ),
+          ],
         ),
       ),
     );
+  }
+
+  String _parentLabel(StopParent p) {
+    final label = p.label.isEmpty ? p.name : p.label;
+    if (label.isEmpty) return 'Parent';
+    return label[0].toUpperCase() + label.substring(1);
   }
 
   Widget _waButton(
@@ -464,17 +509,16 @@ class _StopCard extends StatelessWidget {
     required bool highlight,
     required VoidCallback onTap,
   }) {
-    final icon = const Icon(Icons.chat_rounded, size: 18);
-    return highlight
+    final icon = const Icon(Icons.chat_rounded, size: 20);
+    final button = highlight
         ? FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366),
-            ),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF128C7E), foregroundColor: Colors.white),
             onPressed: onTap,
             icon: icon,
             label: Text(label),
           )
         : OutlinedButton.icon(onPressed: onTap, icon: icon, label: Text(label));
+    return SizedBox(width: double.infinity, child: button);
   }
 
   Widget _stateChip(BuildContext context) {
