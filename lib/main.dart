@@ -6,7 +6,7 @@ import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/theme.dart';
 import 'features/auth/login_screen.dart';
-import 'features/home/home_screen.dart';
+import 'features/shell/app_shell.dart';
 import 'features/transport/location_tracker.dart';
 
 Future<void> main() async {
@@ -39,10 +39,35 @@ class LittleGraduatesApp extends StatelessWidget {
       theme: buildTheme(),
       debugShowCheckedModeBanner: false,
       home: switch (state) {
-        SessionState.loading => const Scaffold(body: Center(child: CircularProgressIndicator())),
+        SessionState.loading => const _BootScreen(),
         SessionState.signedOut => const LoginScreen(),
-        SessionState.signedIn => const HomeScreen(),
+        SessionState.signedIn => const AppShell(),
       },
+    );
+  }
+}
+
+class _BootScreen extends StatelessWidget {
+  const _BootScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Little Graduates',
+                style: TextStyle(color: LgColors.accent, fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(height: 16),
+              CircularProgressIndicator(),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
