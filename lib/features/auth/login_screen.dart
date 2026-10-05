@@ -274,15 +274,19 @@ class _PinScreenState extends State<_PinScreen> {
                               ),
                       ),
                     ),
-                    SizedBox(
-                      height: 320,
-                      child: GridView.count(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.35,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [for (final k in keys) _key(k)],
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: GridView.count(
+                          shrinkWrap: true,
+                          crossAxisCount: 3,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.35,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [for (final k in keys) _key(k)],
+                        ),
                       ),
                     ),
                   ],
