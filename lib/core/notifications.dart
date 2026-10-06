@@ -24,6 +24,7 @@ class Notifications {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
+        linux: LinuxInitializationSettings(defaultActionName: 'Open'),
       ),
       onDidReceiveNotificationResponse: (r) {
         if (r.payload != null) _taps.add(r.payload!);
@@ -41,7 +42,11 @@ class Notifications {
         id: id,
         title: title,
         body: body,
-        notificationDetails: const NotificationDetails(android: _channel, iOS: DarwinNotificationDetails()),
+        notificationDetails: const NotificationDetails(
+          android: _channel,
+          iOS: DarwinNotificationDetails(),
+          linux: LinuxNotificationDetails(),
+        ),
         payload: payload,
       );
 }

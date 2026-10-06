@@ -1,8 +1,9 @@
 # Little Graduates app
 
-Android app (Flutter) for the Little Graduates MTT system. One app for all of MTT: staff sign in with the same name + PIN as the website, and the home screen shows the modules their login has.
+Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. A bottom bar keeps Today, Transport and Staff one tap apart. Other modules open the website.
 
-- **Native modules** have screens in the app. Today that is **Transport** (driver trips with live location).
+- **Transport** is the driver trip screen, with live location.
+- **Staff** is check-in, leave and today's roster. Payroll, documents and messages stay on the website.
 - **Every other module** opens its MTT web page until it is rebuilt here.
 
 The server side lives in the MTT repo (`api/v1/`, `includes/api.php`, migration 072).
@@ -29,11 +30,14 @@ lib/
     session.dart               sign-in state, user, modules (token in secure storage)
     module_registry.dart       module key → native screen; others open the web
     notifications.dart         driver prompts
-    theme.dart                 MTT colours
+    theme.dart                 colours, type, controls
+    nav.dart                   bottom-bar tab switch
   features/
     auth/login_screen.dart     pick name, PIN pad
-    home/home_screen.dart      module tiles
-    transport/                 today list, trip screen, location tracker, API models
+    shell/app_shell.dart       Today, Transport, Staff, More
+    home/home_screen.dart      Today and More
+    transport/                 today's runs, trip screen, location tracker
+    staff/                     check-in, leave, roster
 ```
 
 ### Adding another MTT module to the app
