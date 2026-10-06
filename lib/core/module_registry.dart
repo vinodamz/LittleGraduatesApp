@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../features/staff/staff_screen.dart';
-import '../features/transport/today_screen.dart';
+import '../features/transport/hub_screen.dart';
 import 'nav.dart';
 import 'session.dart';
 
 /// Native screens by module key. To bring another MTT module into the app,
 /// add its screen here and mark it `native` in the server's api_app_modules().
 final Map<String, WidgetBuilder> nativeModuleScreens = {
-  'transport': (_) => const TransportTodayScreen(),
+  'transport': (_) => const TransportHubScreen(),
   'staff': (_) => const StaffScreen(),
 };
 

@@ -5,6 +5,8 @@ import '../../core/api_client.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import 'calendar_screen.dart';
+import 'new_trip_screen.dart';
 import 'transport_api.dart';
 import 'trip_screen.dart';
 
@@ -49,9 +51,12 @@ String tripCta(TripSummary t) => switch (t.status) {
       _ => (LgColors.muted, const Color(0xFFF3EEE8)),
     };
 
-Future<void> openTripSummary(BuildContext context, TripSummary t) async {
+Future<void> openTripSummary(BuildContext context, TripSummary t, {String? date}) async {
   try {
-    final trip = await TransportApi(context.read<ApiClient>()).open(t.routeId, t.direction);
+    final api = TransportApi(context.read<ApiClient>());
+    final trip = t.tripId != null
+        ? await api.trip(t.tripId!)
+        : await api.open(t.routeId, t.direction, date: date);
     if (!context.mounted) return;
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripScreen(initial: trip)));
   } on ApiException catch (e) {
@@ -62,7 +67,13 @@ Future<void> openTripSummary(BuildContext context, TripSummary t) async {
 }
 
 class TransportTodayScreen extends StatefulWidget {
-  const TransportTodayScreen({super.key});
+  const TransportTodayScreen({this.day, this.embedded = false, super.key});
+
+  /// When set, this is that day's runs. Null is today.
+  final DateTime? day;
+
+  /// Inside the transport desk the hub already has an app bar.
+  final bool embedded;
 
   @override
   State<TransportTodayScreen> createState() => _TransportTodayScreenState();
@@ -80,9 +91,18 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
     _load();
   }
 
+  String? get _date => widget.day == null ? null : ymd(widget.day!);
+
+  bool get _isToday {
+    final day = widget.day;
+    if (day == null) return true;
+    final now = DateTime.now();
+    return day.year == now.year && day.month == now.month && day.day == now.day;
+  }
+
   Future<void> _load() async {
     try {
-      final t = await _api.today();
+      final t = await _api.today(_date);
       if (mounted) {
         setState(() {
           _trips = t;
@@ -95,14 +115,51 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
   }
 
   Future<void> _open(TripSummary t) async {
-    final key = '${t.routeId}:${t.direction}';
+    final key = '${t.routeId}:${t.direction}:${t.tripId ?? 0}';
     if (_opening != null) return;
     setState(() => _opening = key);
-    await openTripSummary(context, t);
+    await openTripSummary(context, t, date: _date);
     if (mounted) {
       setState(() => _opening = null);
       await _load();
     }
+  }
+
+  Future<void> _again(TripSummary t) async {
+    final key = 'again:${t.routeId}:${t.direction}';
+    if (_opening != null) return;
+    setState(() => _opening = key);
+    try {
+      final trip = await _api.create(routeId: t.routeId, direction: t.direction, date: _date);
+      if (!mounted) return;
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => TripScreen(initial: trip)));
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+    if (mounted) {
+      setState(() => _opening = null);
+      await _load();
+    }
+  }
+
+  Future<void> _openCalendar() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TripCalendarScreen(
+        onOpenDay: (day) => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => TransportTodayScreen(day: day)),
+        ),
+      ),
+    ));
+    if (mounted) await _load();
+  }
+
+  Future<void> _newTrip() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => NewTripScreen(date: _date)),
+    );
+    if (created == true && mounted) await _load();
   }
 
   @override
@@ -110,22 +167,42 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
     final trips = _trips;
     final groups = trips == null ? const <TripGroup>[] : groupTrips(trips);
     final running = trips?.where((t) => t.status == 'running').length ?? 0;
+    final shown = widget.day ?? DateTime.now();
+    final countLabel = trips == null
+        ? ''
+        : running == 0
+            ? '${trips.length} ${trips.length == 1 ? 'run' : 'runs'}${_isToday ? ' today' : ''}'
+            : '$running running · ${trips.length} ${_isToday ? 'today' : 'runs'}';
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Transport'),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: Text(_isToday ? 'Transport' : formatShortDate(ymd(shown))),
+              actions: [
+                if (_isToday && widget.day == null)
+                  IconButton(tooltip: 'Calendar', onPressed: _openCalendar, icon: const Icon(Icons.calendar_month_rounded)),
+              ],
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _opening != null ? null : _newTrip,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New trip'),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           children: [
-            Text(formatLongDate(DateTime.now()), style: const TextStyle(color: LgColors.muted)),
+            Row(
+              children: [
+                Expanded(child: Text(formatLongDate(shown), style: const TextStyle(color: LgColors.muted))),
+                if (widget.embedded && _isToday)
+                  IconButton(tooltip: 'Calendar', onPressed: _openCalendar, icon: const Icon(Icons.calendar_month_rounded)),
+              ],
+            ),
             if (trips != null && trips.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                running == 0 ? '${trips.length} runs today' : '$running running · ${trips.length} today',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              Text(countLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
             ],
             const SizedBox(height: 12),
             if (_error != null)
@@ -144,14 +221,16 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
               const LgEmptyState(
                 icon: Icons.directions_bus_rounded,
                 title: 'No active routes',
-                message: 'An admin can add cabs and routes on the website under Transport.',
+                message: 'Tap New trip to build a run, or ask an admin to add a route on the website.',
               ),
             for (final g in groups) ...[
               LgSectionTitle(g.label),
               for (final t in g.trips) ...[
                 TripRunCard(
                   trip: t,
-                  busy: _opening == '${t.routeId}:${t.direction}',
+                  busy: _opening == '${t.routeId}:${t.direction}:${t.tripId ?? 0}' ||
+                      _opening == 'again:${t.routeId}:${t.direction}',
+                  onAgain: t.canStartAnother && t.tripId != null && _opening == null ? () => _again(t) : null,
                   onTap: _opening != null ? null : () => _open(t),
                 ),
                 const SizedBox(height: 10),
@@ -165,10 +244,11 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
 }
 
 class TripRunCard extends StatelessWidget {
-  const TripRunCard({required this.trip, required this.onTap, this.busy = false, super.key});
+  const TripRunCard({required this.trip, required this.onTap, this.onAgain, this.busy = false, super.key});
 
   final TripSummary trip;
   final VoidCallback? onTap;
+  final VoidCallback? onAgain;
   final bool busy;
 
   @override
@@ -177,6 +257,7 @@ class TripRunCard extends StatelessWidget {
     final (fg, bg) = tripStatusColors(t.status);
     final progress = t.total > 0 && t.status != 'scheduled' ? t.finished / t.total : null;
     final meta = [
+      if (t.runNo > 1) 'Run ${t.runNo}',
       if (t.time != null) t.time!,
       if (t.cabName.isNotEmpty) t.cabName,
       '${t.children} ${t.children == 1 ? 'child' : 'children'}',
@@ -247,6 +328,8 @@ class TripRunCard extends StatelessWidget {
                 children: [
                   Text(tripCta(t), style: const TextStyle(color: LgColors.accent, fontWeight: FontWeight.w700)),
                   const Spacer(),
+                  if (onAgain != null)
+                    TextButton(onPressed: busy ? null : onAgain, child: const Text('Run again')),
                   if (busy)
                     const SizedBox(
                       width: 18,

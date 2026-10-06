@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -88,12 +89,12 @@ class _TripScreenState extends State<TripScreen> {
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  Future<void> _act(String op, {int? stopId}) async {
+  Future<void> _act(String op, {int? stopId, int? routeId, int? studentId}) async {
     if (op == 'start' && !await _requestLocationConsent()) return;
     if (!mounted) return;
     setState(() => stopId == null ? _busy = true : _busyStop = stopId);
     try {
-      final t = await _api.action(_trip.id, op, stopId: stopId);
+      final t = await _api.action(_trip.id, op, stopId: stopId, routeId: routeId, studentId: studentId);
       if (!mounted) return;
       setState(() => _trip = t);
       if (op == 'start') await _startTracking();
@@ -107,6 +108,78 @@ class _TripScreenState extends State<TripScreen> {
           _busyStop = null;
         });
       }
+    }
+  }
+
+  Future<void> _sos() async {
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Send SOS?'),
+        content: const Text('The school desk gets this alert, with the cab’s live location when the phone has a fix.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Send SOS')),
+        ],
+      ),
+    );
+    if (go != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await _api.sos(_trip.id);
+      if (mounted) _snack('SOS sent to the school desk.');
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _markReached(TripStop s) async {
+    await _act('reached', stopId: s.id);
+    if (!mounted) return;
+    final now = _trip.stops.where((x) => x.id == s.id).firstOrNull;
+    if (now == null || !now.reached || now.hasLocation) return;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Save this pickup?'),
+        content: Text('${s.firstName} has no location yet. Save where the cab is now, and the route times update.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Not now')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save location')),
+        ],
+      ),
+    );
+    if (save == true) await _saveLocation(s);
+  }
+
+  Future<void> _saveLocation(TripStop s) async {
+    if (!await _requestLocationConsent()) return;
+    if (!mounted) return;
+    setState(() => _busyStop = s.id);
+    try {
+      final last = _tracker.lastFix;
+      final fresh = last != null && DateTime.now().difference(last.timestamp).inSeconds < 90;
+      final pos = fresh
+          ? last
+          : await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)),
+            );
+      final t = await _api.action(_trip.id, 'set_location', stopId: s.id, lat: pos.latitude, lng: pos.longitude);
+      if (!mounted) return;
+      setState(() => _trip = t);
+      _snack('Location saved. Route times updated.');
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } on TimeoutException {
+      if (mounted) _snack('No GPS fix yet. Step outside and try again.');
+    } on LocationServiceDisabledException {
+      if (mounted) _snack('Turn on Location in the phone settings, then try again.');
+    } on PermissionDeniedException {
+      if (mounted) _snack('Location permission is needed to save this stop.');
+    } finally {
+      if (mounted) setState(() => _busyStop = null);
     }
   }
 
@@ -154,6 +227,87 @@ class _TripScreenState extends State<TripScreen> {
     if (await _confirm('Cancel this trip for today?')) await _act('cancel');
   }
 
+  bool get _editable => _trip.scheduled || _trip.running;
+
+  Future<void> _changeRoute() async {
+    List<RouteOption> routes;
+    try {
+      routes = (await _api.routes()).where((r) => r.runs(_trip.direction) && r.id != _trip.routeId).toList();
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+      return;
+    }
+    if (!mounted) return;
+    if (routes.isEmpty) {
+      _snack('No other route runs this way.');
+      return;
+    }
+    final picked = await showModalBottomSheet<RouteOption>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text('Change route', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Children already marked stay. Everyone still waiting comes from the route you pick.',
+                style: TextStyle(color: LgColors.muted),
+              ),
+            ),
+            for (final r in routes)
+              ListTile(
+                title: Text(r.name),
+                subtitle: Text('${r.children} ${r.children == 1 ? 'child' : 'children'}'),
+                onTap: () => Navigator.pop(c, r),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    if (!await _confirm('Use ${picked.name} for the rest of this trip?')) return;
+    await _act('set_route', routeId: picked.id);
+  }
+
+  Future<void> _addChild() async {
+    final picked = await showModalBottomSheet<ChildOption>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => _ChildPicker(api: _api),
+    );
+    if (picked == null || !mounted) return;
+    await _act('add', studentId: picked.id);
+  }
+
+  Widget _stopCard(int i, int? nextId) {
+    final s = _trip.stops[i];
+    final prev = i > 0 ? _trip.stops[i - 1] : null;
+    final nextStop = i + 1 < _trip.stops.length ? _trip.stops[i + 1] : null;
+    return _StopCard(
+      stop: s,
+      trip: _trip,
+      next: s.id == nextId,
+      busy: _busyStop == s.id,
+      canUp: _editable && s.pending && prev != null && (_trip.scheduled || prev.pending),
+      canDown: _editable && s.pending && nextStop != null && (_trip.scheduled || nextStop.pending),
+      onAction: (op) => op == 'reached' && !s.hasLocation ? _markReached(s) : _act(op, stopId: s.id),
+      onWhatsApp: (kind, p) => _whatsApp(s, kind, p),
+      onSetLocation: () => _saveLocation(s),
+      onRemove: !_editable || !s.pending
+          ? null
+          : () async {
+              if (await _confirm('Take ${s.firstName} off this trip?')) await _act('remove', stopId: s.id);
+            },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tracker = context.watch<LocationTracker>();
@@ -161,7 +315,22 @@ class _TripScreenState extends State<TripScreen> {
     final nextId = _trip.stops.where((s) => s.pending).map((s) => s.id).firstOrNull;
     final done = _trip.stops.where((s) => !s.pending).length;
     return Scaffold(
-      appBar: AppBar(title: Text(_trip.routeName)),
+      appBar: AppBar(
+        title: Text(_trip.runNo > 1 ? '${_trip.routeName} · Run ${_trip.runNo}' : _trip.routeName),
+        actions: [
+          if (_editable)
+            PopupMenuButton<String>(
+              onSelected: (op) {
+                if (op == 'route') _changeRoute();
+                if (op == 'add') _addChild();
+              },
+              itemBuilder: (c) => const [
+                PopupMenuItem(value: 'route', child: Text('Change route')),
+                PopupMenuItem(value: 'add', child: Text('Add a child')),
+              ],
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _reload,
         child: ListView(
@@ -177,8 +346,29 @@ class _TripScreenState extends State<TripScreen> {
             ),
             const SizedBox(height: 12),
             _ProgressCard(trip: _trip, done: done),
+            if (_trip.running) ...[
+              const SizedBox(height: 12),
+              _RideStats(trip: _trip),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : _sos,
+                  style: OutlinedButton.styleFrom(foregroundColor: LgColors.danger),
+                  icon: const Icon(Icons.sos_rounded),
+                  label: const Text('SOS — alert the school'),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             _TrackingBanner(trip: _trip, tracker: tracker, onRetry: _startTracking),
+            if (_editable) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Change the route or add a child from the menu. Move a waiting child with the arrows, or mark them absent.',
+                style: TextStyle(color: LgColors.muted, height: 1.4),
+              ),
+            ],
             if (_trip.scheduled) ...[
               const SizedBox(height: 12),
               Text(
@@ -198,17 +388,11 @@ class _TripScreenState extends State<TripScreen> {
               ),
             ],
             const SizedBox(height: 8),
-            for (final s in _trip.stops) ...[
-              const SizedBox(height: 10),
-              _StopCard(
-                stop: s,
-                trip: _trip,
-                next: s.id == nextId,
-                busy: _busyStop == s.id,
-                onAction: (op) => _act(op, stopId: s.id),
-                onWhatsApp: (kind, p) => _whatsApp(s, kind, p),
+            for (var i = 0; i < _trip.stops.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: _stopCard(i, nextId),
               ),
-            ],
           ],
         ),
       ),
@@ -221,6 +405,55 @@ class _TripScreenState extends State<TripScreen> {
               onCancel: _cancel,
             )
           : null,
+    );
+  }
+}
+
+class _RideStats extends StatelessWidget {
+  const _RideStats({required this.trip});
+
+  final Trip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final aboard = trip.direction == 'drop' ? trip.pendingCount : trip.stops.where((s) => s.status == 'done').length;
+    final done = trip.stops.where((s) => !s.pending).length;
+    final next = trip.stops.where((s) => s.pending && s.etaMinutes != null).map((s) => s.etaMinutes!).firstOrNull;
+    final started = trip.startedAt;
+    final minutes = started == null ? null : DateTime.now().difference(started).inMinutes;
+    final gps = trip.lastLocationAt != null && DateTime.now().difference(trip.lastLocationAt!).inSeconds < 180;
+    final cells = [
+      ('$aboard', 'Aboard'),
+      ('$done/${trip.stops.length}', 'Stops'),
+      (next == null ? '—' : '$next min', 'Next'),
+      (minutes == null ? '—' : '$minutes min', 'On road'),
+      (gps ? 'On' : 'Waiting', 'GPS'),
+    ];
+    return Row(
+      children: [
+        for (final c in cells)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: LgColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: LgColors.line),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  child: Column(
+                    children: [
+                      Text(c.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text(c.$2, style: const TextStyle(color: LgColors.muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -386,16 +619,24 @@ class _StopCard extends StatelessWidget {
     required this.trip,
     required this.next,
     required this.busy,
+    required this.canUp,
+    required this.canDown,
     required this.onAction,
     required this.onWhatsApp,
+    required this.onSetLocation,
+    required this.onRemove,
   });
 
   final TripStop stop;
   final Trip trip;
   final bool next;
   final bool busy;
+  final bool canUp;
+  final bool canDown;
   final void Function(String op) onAction;
   final void Function(String kind, StopParent p) onWhatsApp;
+  final VoidCallback onSetLocation;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -442,8 +683,43 @@ class _StopCard extends StatelessWidget {
                 _stateChip(context),
               ],
             ),
+            if ((trip.scheduled || trip.running) && s.pending) ...[
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Earlier',
+                    onPressed: busy || !canUp ? null : () => onAction('up'),
+                    icon: const Icon(Icons.arrow_upward_rounded),
+                  ),
+                  IconButton(
+                    tooltip: 'Later',
+                    onPressed: busy || !canDown ? null : () => onAction('down'),
+                    icon: const Icon(Icons.arrow_downward_rounded),
+                  ),
+                  const Spacer(),
+                  if (onRemove != null)
+                    TextButton(onPressed: busy ? null : onRemove, child: const Text('Remove')),
+                ],
+              ),
+            ],
             if (trip.running && s.pending) ...[
               const SizedBox(height: 12),
+              if (!s.hasLocation)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'No location saved. Reach the stop, then save where you are so the route times update.',
+                    style: TextStyle(color: LgColors.muted, fontSize: 13, height: 1.3),
+                  ),
+                ),
+              if (!s.hasLocation && s.reached) ...[
+                FilledButton.icon(
+                  onPressed: busy ? null : onSetLocation,
+                  icon: const Icon(Icons.my_location_rounded),
+                  label: const Text('Save location here'),
+                ),
+                const SizedBox(height: 8),
+              ],
               if (!s.reached)
                 OutlinedButton(
                   onPressed: busy ? null : () => onAction('reached'),
@@ -458,24 +734,13 @@ class _StopCard extends StatelessWidget {
                 onPressed: busy ? null : () => onAction('absent'),
                 child: const Text('Mark absent'),
               ),
-              if (s.parents.isEmpty)
-                const Text('No parent phone on file.', style: TextStyle(color: LgColors.muted, fontSize: 13))
-              else ...[
-                const Text('Message family', style: TextStyle(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                for (final p in s.parents) ...[
-                  if (!s.reached) ...[
-                    _waButton('${_parentLabel(p)}: 5 min away', highlight: due, onTap: () => onWhatsApp('eta', p)),
-                    const SizedBox(height: 8),
-                  ],
-                  _waButton(
-                    '${_parentLabel(p)}: cab reached',
-                    highlight: s.reached && !s.reachedAlertSent,
-                    onTap: () => onWhatsApp('reached', p),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
+              if (s.parents.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: due || (s.reached && !s.reachedAlertSent)
+                      ? FilledButton(onPressed: busy ? null : () => _openMore(context), child: const Text('More'))
+                      : TextButton(onPressed: busy ? null : () => _openMore(context), child: const Text('More')),
+                ),
               if (s.etaAlertSent || s.reachedAlertSent)
                 Text(
                   [
@@ -487,12 +752,65 @@ class _StopCard extends StatelessWidget {
             ] else if (trip.running)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: busy ? null : () => onAction('undo'),
-                  child: const Text('Undo'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!s.hasLocation && s.reached)
+                      FilledButton.icon(
+                        onPressed: busy ? null : onSetLocation,
+                        icon: const Icon(Icons.my_location_rounded),
+                        label: const Text('Save location here'),
+                      ),
+                    TextButton(
+                      onPressed: busy ? null : () => onAction('undo'),
+                      child: const Text('Undo'),
+                    ),
+                  ],
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _openMore(BuildContext context) {
+    final s = stop;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Message family', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              const SizedBox(height: 12),
+              if (s.parents.isEmpty)
+                const Text('No parent phone on file.', style: TextStyle(color: LgColors.muted))
+              else
+                for (final p in s.parents) ...[
+                  if (!s.reached) ...[
+                    _waButton('${_parentLabel(p)}: 5 min away', highlight: s.etaAlertDue, onTap: () {
+                      Navigator.pop(c);
+                      onWhatsApp('eta', p);
+                    }),
+                    const SizedBox(height: 8),
+                  ],
+                  _waButton(
+                    '${_parentLabel(p)}: cab reached',
+                    highlight: s.reached && !s.reachedAlertSent,
+                    onTap: () {
+                      Navigator.pop(c);
+                      onWhatsApp('reached', p);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+            ],
+          ),
         ),
       ),
     );
@@ -551,6 +869,109 @@ class _StopCard extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+class _ChildPicker extends StatefulWidget {
+  const _ChildPicker({required this.api});
+
+  final TransportApi api;
+
+  @override
+  State<_ChildPicker> createState() => _ChildPickerState();
+}
+
+class _ChildPickerState extends State<_ChildPicker> {
+  final _search = TextEditingController();
+  Timer? _debounce;
+  List<ChildOption> _children = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _search.addListener(() {
+      _debounce?.cancel();
+      _debounce = Timer(const Duration(milliseconds: 300), () => _load(_search.text));
+    });
+    _load('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load(String q) async {
+    try {
+      final children = await widget.api.children(q);
+      if (mounted) {
+        setState(() {
+          _children = children;
+          _loading = false;
+          _error = null;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.message;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final height = MediaQuery.sizeOf(context).height * 0.75;
+    return SizedBox(
+      height: height,
+      child: Column(
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Add a child', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _search,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Search by name',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(_error!, style: const TextStyle(color: LgColors.danger)),
+            ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    children: [
+                      for (final c in _children)
+                        ListTile(
+                          title: Text(c.name),
+                          subtitle: c.grade.isEmpty ? null : Text(c.grade),
+                          onTap: () => Navigator.pop(context, c),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
       ),
     );
   }

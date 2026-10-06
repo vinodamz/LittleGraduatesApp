@@ -9,6 +9,7 @@ import 'package:little_graduates/core/format.dart';
 import 'package:little_graduates/core/theme.dart';
 import 'package:little_graduates/features/auth/login_screen.dart';
 import 'package:little_graduates/features/staff/staff_api.dart';
+import 'package:little_graduates/features/transport/calendar_screen.dart';
 import 'package:little_graduates/features/transport/today_screen.dart';
 import 'package:little_graduates/features/transport/transport_api.dart';
 import 'package:provider/provider.dart';
@@ -44,6 +45,15 @@ void main() {
     expect(groups.map((g) => g.direction), ['pickup', 'drop']);
     expect(groups.first.trips.map((t) => t.routeName), ['HSR', 'Kaloor']);
     expect(groups.last.label, 'Afternoon drop');
+  });
+
+  test('the trip calendar starts weeks on Monday', () {
+    final cells = monthGrid(DateTime(2026, 10, 1));
+    expect(cells.length % 7, 0);
+    expect(cells[0], isNull);
+    expect(cells[3], DateTime(2026, 10, 1));
+    expect(cells[7], DateTime(2026, 10, 5));
+    expect(cells.whereType<DateTime>().length, 31);
   });
 
   test('trip action follows the run status', () {

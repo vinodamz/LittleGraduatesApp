@@ -6,7 +6,7 @@ import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../home/home_screen.dart';
 import '../staff/staff_screen.dart';
-import '../transport/today_screen.dart';
+import '../transport/hub_screen.dart';
 
 class _Tab {
   const _Tab(this.key, this.label, this.icon, this.page);
@@ -33,7 +33,7 @@ class _AppShellState extends State<AppShell> {
     return [
       const _Tab('today', 'Today', Icons.wb_sunny_rounded, TodayScreen()),
       if (keys.contains('transport'))
-        const _Tab('transport', 'Transport', Icons.directions_bus_rounded, TransportTodayScreen()),
+        const _Tab('transport', 'Transport', Icons.directions_bus_rounded, TransportHubScreen()),
       if (keys.contains('staff')) const _Tab('staff', 'Staff', Icons.badge_rounded, StaffScreen()),
       const _Tab('more', 'More', Icons.grid_view_rounded, MoreScreen()),
     ];
