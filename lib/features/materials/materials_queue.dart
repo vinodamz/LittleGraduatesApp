@@ -283,6 +283,8 @@ abstract class UploadScheduler {
 }
 
 class NoopScheduler implements UploadScheduler {
+  const NoopScheduler();
+
   @override
   Future<void> schedule() async {}
 }
@@ -531,7 +533,7 @@ class MaterialsQueue {
     try {
       do {
         _again = false;
-        await _recover();
+        if (await _recover()) outcome.uploadedAny = true;
         final skipped = <int>{};
         while (true) {
           final all = await store.all();
@@ -553,7 +555,8 @@ class MaterialsQueue {
     return outcome;
   }
 
-  Future<void> _recover() async {
+  Future<bool> _recover() async {
+    var uploaded = false;
     final results = await bridge.takeUploadResults();
     for (final result in results) {
       final all = await store.all();
@@ -563,7 +566,7 @@ class MaterialsQueue {
       }
       if (item?.id == null) continue;
       if (result.ok) {
-        await _finishSuccess(item!.id!, item.sentGeneration ?? item.generation);
+        if (await _finishSuccess(item!.id!, item.sentGeneration ?? item.generation)) uploaded = true;
       } else if (result.body.contains('condition_required')) {
         await store.update(item!.copyWith(status: OutboxStatus.waiting, lastError: 'Pick a condition to send this.', updatedAt: now()));
       } else if (result.status == 401) {
@@ -614,6 +617,7 @@ class MaterialsQueue {
         await store.update(item.copyWith(status: back, uploadChannel: '', updatedAt: now()));
       }
     }
+    return uploaded;
   }
 
   OutboxItem? _next(List<OutboxItem> all, Set<int> skipped) {

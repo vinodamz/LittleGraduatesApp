@@ -212,12 +212,11 @@ void main() {
       notes: 'first',
     );
     await harness.queue.drain();
-    final open = (await harness.store.all()).single;
-    expect(open.notes, 'second');
-    expect(open.status, OutboxStatus.pending);
-    await harness.queue.drain();
-    expect((await harness.store.all()).single.status, OutboxStatus.uploaded);
-    expect(harness.transport.calls.last.notes, 'second');
+    final row = (await harness.store.all()).single;
+    expect(row.notes, 'second');
+    expect(row.status, OutboxStatus.uploaded);
+    expect(harness.transport.calls.map((call) => call.notes), ['first', 'second']);
+    expect(harness.transport.calls.map((call) => call.clientKey).toSet(), {row.clientKey});
   });
 
   test('a missing condition is waiting, not a permanent failure', () async {

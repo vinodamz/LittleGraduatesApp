@@ -149,7 +149,7 @@ class _SummaryStrip extends StatelessWidget {
       ('${summary.notes}', 'Notes', LgColors.ink),
     ];
     return SizedBox(
-      height: 78,
+      height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: tiles.length,
@@ -158,7 +158,7 @@ class _SummaryStrip extends StatelessWidget {
           final tile = tiles[index];
           return Container(
             width: 108,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: LgColors.surface,
               borderRadius: BorderRadius.circular(16),
@@ -167,8 +167,8 @@ class _SummaryStrip extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tile.$1, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: tile.$3)),
-                Text(tile.$2, style: const TextStyle(color: LgColors.muted, fontSize: 13)),
+                Text(tile.$1, style: TextStyle(fontSize: 20, height: 1.1, fontWeight: FontWeight.w700, color: tile.$3)),
+                Text(tile.$2, style: const TextStyle(color: LgColors.muted, fontSize: 13, height: 1.1)),
               ],
             ),
           );
