@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../features/materials/materials_screen.dart';
 import '../features/staff/staff_screen.dart';
 import '../features/transport/hub_screen.dart';
 import 'nav.dart';
@@ -11,6 +12,7 @@ import 'session.dart';
 final Map<String, WidgetBuilder> nativeModuleScreens = {
   'transport': (_) => const TransportHubScreen(),
   'staff': (_) => const StaffScreen(),
+  'materials': (_) => const MaterialsScreen(),
 };
 
 const Map<String, IconData> moduleIcons = {
@@ -30,13 +32,13 @@ const Map<String, IconData> moduleIcons = {
   'recruitment': Icons.work_rounded,
 };
 
-/// Transport and Staff have screens in this build even if an older server
-/// still marks them as website links.
+/// Transport, Staff and Materials have screens in this build even if an
+/// older server still marks them as website links.
 bool moduleOpensInApp(AppModule m) =>
-    m.native || m.key == 'transport' || m.key == 'staff';
+    m.native || m.key == 'transport' || m.key == 'staff' || m.key == 'materials';
 
 Future<void> openModule(BuildContext context, AppModule m) async {
-  if (m.key == 'transport' || m.key == 'staff') {
+  if (m.key == 'transport' || m.key == 'staff' || m.key == 'materials') {
     final nav = LgNav.maybeOf(context);
     if (nav != null) {
       nav.go(m.key);

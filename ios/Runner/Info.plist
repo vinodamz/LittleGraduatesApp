@@ -47,6 +47,22 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos and videos of classroom materials during the daily check.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record sound with material-check videos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach existing photos and videos of classroom materials.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>in.thelittlegraduates.app.materials</string>
+		<string>in.thelittlegraduates.app.materials.refresh</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

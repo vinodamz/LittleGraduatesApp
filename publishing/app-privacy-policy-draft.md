@@ -1,6 +1,6 @@
 # Little Graduates app privacy policy — draft for website publication
 
-Updated: 2 October 2026
+Updated: 21 October 2026
 
 The Little Graduates app is operated by PARENT PETAL LITTLE STEPS LLP. It is intended for authorized adult school staff and transport drivers.
 
@@ -12,6 +12,8 @@ The transport module displays trip schedules, vehicle and route details, child p
 
 During an active driver trip, the app collects precise location, location timestamps, accuracy, speed and heading. Location is sent to the school transport system to show the cab location, estimate arrivals and support pickup/drop operations. Tracking continues when the app is in the background or the phone screen is off. Tracking stops when the trip is finished or cancelled. Android shows an ongoing notification while tracking runs.
 
+The materials check lets staff photograph or record classroom materials and write a short condition note. Photos, videos and notes are stored on the phone until the upload finishes, including if the app is closed or offline, and are then sent to the school materials record. The copies on the phone are deleted after the school server confirms the upload. Android shows an ongoing notification while those uploads run. Camera, microphone and photo-library access are used only when a staff member attaches a material photo or video.
+
 ## Who can access information
 
 Authorized school staff can access information permitted by their account. Families can view their child’s cab location through the private tracking link issued by the school. If a driver chooses to send a WhatsApp alert, the alert is opened in WhatsApp. Other staff modules open the school’s MTT website and their data practices must also be covered by this policy.
@@ -22,7 +24,7 @@ Driver location and trip records are retained for one year. Users can request de
 
 ## Advertising and permissions
 
-The app contains no advertisements and does not use the Android advertising ID. Location permission is used for trip tracking. Notification permission is used for trip notifications. Users can withdraw permissions in their device settings; this may stop transport tracking.
+The app contains no advertisements and does not use the Android advertising ID. Location permission is used for trip tracking. Camera, microphone and photo-library permissions are used for material checks. Notification permission is used for trip notifications and material uploads. Users can withdraw permissions in their device settings; this may stop transport tracking or material photos.
 
 ## Contact
 

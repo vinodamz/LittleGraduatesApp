@@ -1,9 +1,10 @@
 # Little Graduates app
 
-Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. A bottom bar keeps Today, Transport and Staff one tap apart. Other modules open the website.
+Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. A bottom bar keeps Today, Transport, Staff and Materials one tap apart. Other modules open the website.
 
 - **Transport** is the driver trip screen, with live location.
 - **Staff** is check-in, leave and today's roster. Payroll, documents and messages stay on the website.
+- **Materials** is the daily shelf check. Marks, photos and videos are saved on the phone first, then uploaded in the background. Audit history, trends, the monthly board and duties stay on the website.
 - **Every other module** opens its MTT web page until it is rebuilt here.
 
 The server side lives in the MTT repo (`api/v1/`, `includes/api.php`, migration 072).
@@ -34,11 +35,22 @@ lib/
     nav.dart                   bottom-bar tab switch
   features/
     auth/login_screen.dart     pick name, PIN pad
-    shell/app_shell.dart       Today, Transport, Staff, More
+    shell/app_shell.dart       Today, Transport, Staff, Materials, More
     home/home_screen.dart      Today and More
     transport/                 today's runs, trip screen, location tracker
     staff/                     check-in, leave, roster
+    materials/                 daily shelf check, local outbox, background upload
 ```
+
+## Materials (daily check)
+
+1. Open **Materials**. Today's active materials are grouped by shelf. Pick a condition, add an optional note, and attach a camera photo, a camera video, or a gallery file. "Rest are Good" marks the unmarked materials on that shelf only.
+2. The check and the original file are written to this phone immediately (sqlite plus `materials_outbox/`). Closing the app, losing the network, or leaving the screen does not drop them.
+3. Photos are scaled to 1600px and re-encoded as JPEG (quality 75). Videos wider than 720p, or larger than 12 MB, are transcoded to 720p. Originals stay until the school server confirms the upload, then they are deleted.
+4. Android uploads with WorkManager (a data-sync foreground notification, plus an hourly refresh). iOS uploads the file bytes with a background URL session, and uses a background processing task for the queue. Each item has an idempotency key so a retry does not create a second photo.
+5. The Materials tab and the Today screen show how many items are still on the phone. A failed item has a Retry button.
+
+Apply MTT migration `076` before shipping the app build. Until that column exists, media uploads get a retryable server error instead of a duplicate file.
 
 ### Adding another MTT module to the app
 

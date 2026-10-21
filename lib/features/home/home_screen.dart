@@ -9,6 +9,7 @@ import '../../core/privacy.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../materials/materials_controller.dart';
 import '../staff/staff_api.dart';
 import '../staff/staff_screen.dart';
 import '../transport/location_tracker.dart';
@@ -120,6 +121,7 @@ class _TodayScreenState extends State<TodayScreen> {
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     final tracker = context.watch<LocationTracker>();
+    final materialsPending = context.watch<MaterialsController>().pendingCount;
     final user = session.user;
     final now = DateTime.now();
     final upcoming = [
@@ -128,7 +130,7 @@ class _TodayScreenState extends State<TodayScreen> {
     ];
     final others = [
       for (final m in session.modules)
-        if (m.key != 'transport' && m.key != 'staff') m,
+        if (m.key != 'transport' && m.key != 'staff' && m.key != 'materials') m,
     ];
 
     return Scaffold(
@@ -149,6 +151,8 @@ class _TodayScreenState extends State<TodayScreen> {
               _LiveTripBanner(routeName: tracker.routeName, onOpen: _openRunningTrip),
               const SizedBox(height: 16),
             ],
+            if (session.modules.any((m) => m.key == 'materials'))
+              _MaterialsUploadBanner(pending: materialsPending),
             if (_hasStaff && _staff != null) ...[
               StaffAttendanceCard(
                 day: _staff!,
@@ -258,6 +262,49 @@ class _LiveTripBanner extends StatelessWidget {
   }
 }
 
+class _MaterialsUploadBanner extends StatelessWidget {
+  const _MaterialsUploadBanner({required this.pending});
+
+  final int pending;
+
+  @override
+  Widget build(BuildContext context) {
+    if (pending <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: LgColors.infoBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFC5D7EE)),
+        ),
+        child: InkWell(
+          onTap: () => LgNav.maybeOf(context)?.go('materials'),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.cloud_upload_rounded, color: LgColors.info),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    pending == 1
+                        ? '1 material check is still uploading'
+                        : '$pending material checks are still uploading',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: LgColors.info),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: LgColors.info),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ModuleRow extends StatelessWidget {
   const ModuleRow({required this.module, super.key});
 
@@ -321,7 +368,7 @@ class MoreScreen extends StatelessWidget {
     final session = context.watch<Session>();
     final modules = [
       for (final m in session.modules)
-        if (m.key != 'transport' && m.key != 'staff') m,
+        if (m.key != 'transport' && m.key != 'staff' && m.key != 'materials') m,
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('More')),
@@ -352,7 +399,7 @@ class MoreScreen extends StatelessWidget {
           if (modules.isEmpty)
             const LgEmptyState(
               icon: Icons.grid_view_rounded,
-              title: 'Transport and Staff are in the tabs',
+              title: 'Transport, Staff and Materials are in the tabs',
               message: 'Other school tools show up here when your login has them.',
             )
           else
@@ -373,7 +420,9 @@ class MoreScreen extends StatelessWidget {
                 context: context,
                 builder: (c) => AlertDialog(
                   title: const Text('Sign out?'),
-                  content: const Text('This phone will stop sharing a trip location, if one is running.'),
+                  content: const Text(
+                    'This phone will stop sharing a trip location, if one is running. Material photos already saved on the phone stay here and upload after the next sign-in.',
+                  ),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Stay signed in')),
                     FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Sign out')),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,6 +7,8 @@ import '../../core/nav.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../home/home_screen.dart';
+import '../materials/materials_controller.dart';
+import '../materials/materials_screen.dart';
 import '../staff/staff_screen.dart';
 import '../transport/hub_screen.dart';
 
@@ -17,7 +21,7 @@ class _Tab {
   final Widget page;
 }
 
-/// Signed-in frame. Today, Transport and Staff stay one tap apart.
+/// Signed-in frame. Today, Transport, Staff and Materials stay one tap apart.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -25,8 +29,27 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      unawaited(context.read<MaterialsController>().kick());
+    }
+  }
 
   List<_Tab> _tabs(Session session) {
     final keys = session.modules.map((m) => m.key).toSet();
@@ -35,6 +58,8 @@ class _AppShellState extends State<AppShell> {
       if (keys.contains('transport'))
         const _Tab('transport', 'Transport', Icons.directions_bus_rounded, TransportHubScreen()),
       if (keys.contains('staff')) const _Tab('staff', 'Staff', Icons.badge_rounded, StaffScreen()),
+      if (keys.contains('materials'))
+        const _Tab('materials', 'Materials', Icons.category_rounded, MaterialsScreen()),
       const _Tab('more', 'More', Icons.grid_view_rounded, MoreScreen()),
     ];
   }

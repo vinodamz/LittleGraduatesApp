@@ -1,26 +1,48 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:workmanager/workmanager.dart';
 
 import 'core/api_client.dart';
 import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/theme.dart';
 import 'features/auth/login_screen.dart';
+import 'features/materials/materials_background.dart';
+import 'features/materials/materials_controller.dart';
 import 'features/shell/app_shell.dart';
 import 'features/transport/location_tracker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Notifications.init();
+  try {
+    await Workmanager().initialize(materialsCallbackDispatcher);
+    await WorkmanagerMaterialsScheduler().ensurePeriodic();
+  } catch (_) {
+    // Desktop and tests have no WorkManager. The in-process queue still runs.
+  }
   final api = ApiClient();
   final session = Session(api);
   final tracker = LocationTracker(api);
+  final materials = await MaterialsController.open(api);
+  String? seenToken;
+  var haveToken = false;
+  session.addListener(() {
+    final token = session.state == SessionState.signedIn ? api.token : null;
+    if (haveToken && token == seenToken) return;
+    haveToken = true;
+    seenToken = token;
+    unawaited(materials.rememberToken(token));
+  });
   runApp(
     MultiProvider(
       providers: [
         Provider.value(value: api),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider.value(value: tracker),
+        ChangeNotifierProvider.value(value: materials),
       ],
       child: const LittleGraduatesApp(),
     ),

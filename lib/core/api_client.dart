@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -22,6 +23,8 @@ class ApiException implements Exception {
 class ApiClient {
   ApiClient({http.Client? client}) : _http = client ?? http.Client();
 
+  static const userAgent = 'Mozilla/5.0 (Linux; Android) LittleGraduatesApp/1.0';
+
   final http.Client _http;
   String? token;
 
@@ -35,7 +38,13 @@ class ApiClient {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         // Browser-like agent: the host's bot filter blocks unknown clients.
-        'User-Agent': 'Mozilla/5.0 (Linux; Android) LittleGraduatesApp/1.0',
+        'User-Agent': userAgent,
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+  Map<String, String> get _acceptHeaders => {
+        'Accept': 'application/json',
+        'User-Agent': userAgent,
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
@@ -45,14 +54,37 @@ class ApiClient {
   Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) =>
       _send(() => _http.post(_uri(path), headers: _headers, body: jsonEncode(body ?? {})));
 
-  Future<Map<String, dynamic>> _send(Future<http.Response> Function() request) async {
+  /// Multipart upload. Used for material photos and videos, which can take
+  /// longer than a JSON call.
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required String filePath,
+    required String filename,
+  }) {
+    final request = http.MultipartRequest('POST', _uri(path));
+    request.headers.addAll(_acceptHeaders);
+    request.fields.addAll(fields);
+    return _send(() async {
+      request.files.add(await http.MultipartFile.fromPath('media', filePath, filename: filename));
+      final streamed = await _http.send(request);
+      return http.Response.fromStream(streamed);
+    }, timeout: const Duration(minutes: 5));
+  }
+
+  Future<Map<String, dynamic>> _send(
+    Future<http.Response> Function() request, {
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
     http.Response res;
     try {
-      res = await request().timeout(const Duration(seconds: 20));
+      res = await request().timeout(timeout);
     } on SocketException {
       throw ApiException('No internet connection.');
     } on HttpException {
       throw ApiException('Could not reach the school server.');
+    } on TimeoutException {
+      throw ApiException('The school server did not respond.');
     } on Exception {
       throw ApiException('The school server did not respond.');
     }
