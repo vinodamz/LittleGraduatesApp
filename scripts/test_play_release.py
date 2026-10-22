@@ -1,6 +1,8 @@
 import argparse
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from play_release import release, version_code
 
@@ -43,6 +45,26 @@ class ReleaseTests(unittest.TestCase):
             s = Session(uploaded='999')
             with self.assertRaises(ValueError): release(s, 'upload', '1001', bundle)
             self.assertEqual(s.calls[-1][0], 'DELETE')
+    def test_http_error_prints_response_body(self):
+        class Denied(Reply):
+            status_code = 403
+            text = '{"error":{"code":403,"message":"permission denied"}}'
+            def raise_for_status(self):
+                raise RuntimeError('403')
+        class DeniedSession(Session):
+            def request(self, method, url, **kwargs):
+                self.calls.append((method, url, kwargs))
+                if method == 'POST' and url.endswith('/edits'):
+                    return Reply({'id': 'edit'})
+                return Denied({})
+        with tempfile.TemporaryDirectory() as folder:
+            bundle = Path(folder) / 'app.aab'
+            bundle.write_bytes(b'fake bundle')
+            output = io.StringIO()
+            with redirect_stdout(output):
+                with self.assertRaises(RuntimeError):
+                    release(DeniedSession(), 'upload', '1001', bundle)
+        self.assertIn('{"error":{"code":403,"message":"permission denied"}}', output.getvalue())
     def test_version_limits(self):
         for code in ['0', '-1', 'abc', '2100000001']:
             with self.assertRaises(argparse.ArgumentTypeError): version_code(code)

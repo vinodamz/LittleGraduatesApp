@@ -17,6 +17,9 @@ def version_code(value):
 def release(session, mode, code, bundle=None):
     def request(method, url, **kwargs):
         response = session.request(method, url, timeout=300, **kwargs)
+        status = getattr(response, 'status_code', None)
+        if status is not None and status >= 400:
+            print(f'Play API HTTP {status} body: {getattr(response, "text", "")}')
         response.raise_for_status()
         return response.json() if response.content else {}
 
