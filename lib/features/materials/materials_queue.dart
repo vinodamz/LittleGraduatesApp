@@ -557,7 +557,14 @@ class MaterialsQueue {
 
   Future<bool> _recover() async {
     var uploaded = false;
-    final results = await bridge.takeUploadResults();
+    // A headless Android engine has no materials channel. Probing it must not
+    // fail the whole drain; there are simply no background-session results.
+    final List<BackgroundUploadResult> results;
+    try {
+      results = await bridge.takeUploadResults();
+    } on NeedsDeviceCompressor {
+      return false;
+    }
     for (final result in results) {
       final all = await store.all();
       OutboxItem? item;
@@ -596,7 +603,12 @@ class MaterialsQueue {
       }
     }
 
-    final inflight = await bridge.inFlightUploads();
+    final Set<String> inflight;
+    try {
+      inflight = await bridge.inFlightUploads();
+    } on NeedsDeviceCompressor {
+      return uploaded;
+    }
     final fresh = await store.all();
     for (final item in fresh) {
       if (item.id == null) continue;

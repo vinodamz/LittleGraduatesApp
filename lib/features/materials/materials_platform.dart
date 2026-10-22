@@ -53,7 +53,14 @@ class ChannelMaterialsBridge implements MaterialsBridge {
 
   @override
   Future<List<BackgroundUploadResult>> takeUploadResults() async {
-    final raw = await _invoke('takeUploadResults');
+    // The Android worker's engine has no Activity, so this channel is absent.
+    // That is "no finished background uploads", not a reason to abort the queue.
+    final Object? raw;
+    try {
+      raw = await _invoke('takeUploadResults');
+    } on NeedsDeviceCompressor {
+      return const [];
+    }
     if (raw is! List) return const [];
     return [
       for (final item in raw)
@@ -69,7 +76,12 @@ class ChannelMaterialsBridge implements MaterialsBridge {
 
   @override
   Future<Set<String>> inFlightUploads() async {
-    final raw = await _invoke('inFlightUploads');
+    final Object? raw;
+    try {
+      raw = await _invoke('inFlightUploads');
+    } on NeedsDeviceCompressor {
+      return const {};
+    }
     if (raw is! List) return const {};
     return {for (final key in raw) '$key'};
   }

@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -12,7 +12,9 @@ import 'package:little_graduates/core/module_registry.dart';
 import 'package:little_graduates/core/session.dart';
 import 'package:little_graduates/features/materials/image_codec.dart';
 import 'package:little_graduates/features/materials/materials_api.dart';
+import 'package:little_graduates/features/materials/materials_background.dart';
 import 'package:little_graduates/features/materials/materials_controller.dart';
+import 'package:little_graduates/features/materials/materials_platform.dart';
 import 'package:little_graduates/features/materials/materials_queue.dart';
 import 'package:little_graduates/features/materials/materials_screen.dart';
 import 'package:little_graduates/features/materials/materials_sqlite.dart';
@@ -119,6 +121,45 @@ void main() {
     await harness.queue.drain();
     expect(harness.transport.calls, isEmpty);
     expect((await harness.store.get(saved.id!))!.status, OutboxStatus.waiting);
+  });
+
+  test('a headless worker still uploads when the device channel is missing', () async {
+    final root = Directory.systemTemp.createTempSync('lg-materials-headless');
+    final store = MemoryMaterialsStore();
+    final transport = _ScriptTransport();
+    final queue = MaterialsQueue(
+      store: store,
+      root: root,
+      transport: transport,
+      bridge: _HeadlessBridge(),
+      scheduler: const NoopScheduler(),
+      compressPhotoBytes: (bytes) async => bytes,
+      now: () => DateTime(2026, 10, 21, 9),
+    );
+    await queue.enqueueMark(
+      materialId: 4,
+      checkDate: '2026-10-21',
+      location: 'Sensorial',
+      conditionCode: 'good',
+      notes: '',
+    );
+    final outcome = await queue.drain();
+    expect(outcome.retry, isFalse);
+    expect(transport.calls, hasLength(1));
+    expect((await store.all()).single.status, OutboxStatus.uploaded);
+
+    const channel = MethodChannel('in.thelittlegraduates.app/materials_upload_missing');
+    final bridge = ChannelMaterialsBridge(channel: channel);
+    expect(await bridge.takeUploadResults(), isEmpty);
+    expect(await bridge.inFlightUploads(), isEmpty);
+  });
+
+  test('failure logs drop bearer tokens', () {
+    expect(
+      materialsFailureReason(Exception('Authorization Bearer abc.def.ghi rejected')),
+      isNot(contains('abc.def')),
+    );
+    expect(materialsFailureReason(Exception('Authorization Bearer abc.def.ghi rejected')), contains('Bearer [redacted]'));
   });
 
   test('a retry sends the same client key and a 400 is not retried', () async {
@@ -379,6 +420,14 @@ class _ScriptTransport implements MaterialsTransport {
       mime: item.mime,
     ));
   }
+}
+
+class _HeadlessBridge extends _ScriptBridge {
+  @override
+  Future<List<BackgroundUploadResult>> takeUploadResults() async => throw NeedsDeviceCompressor();
+
+  @override
+  Future<Set<String>> inFlightUploads() async => throw NeedsDeviceCompressor();
 }
 
 class _ScriptBridge implements MaterialsBridge {
