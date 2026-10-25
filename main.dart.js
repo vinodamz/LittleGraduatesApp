@@ -127367,13 +127367,13 @@ s=a.style
 s.border="0"
 s.width="100%"
 s.height="100%"
-a.setAttribute("referrerpolicy","no-referrer")
+a.setAttribute("referrerpolicy","strict-origin")
 a.setAttribute("allow","microphone "+A.ev("https://mtt.thelittlegraduates.in",0,null).gpn())
 a.setAttribute("sandbox","allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox")
 r=r.a
 s=r.c
 r=r.d
-a.srcdoc='<!doctype html><html lang="en"><head><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>\n<form method="post" action="'+B.mm.cL("https://mtt.thelittlegraduates.in/app/open.php")+'"><input type="hidden" name="token" value="'+B.mm.cL(s)+'"><input type="hidden" name="path" value="'+B.mm.cL(r)+'"></form>\n<script>document.forms[0].submit();</script></body></html>'},
+a.srcdoc='<!doctype html><html lang="en"><head><meta name="referrer" content="strict-origin"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>\n<form method="post" action="'+B.mm.cL("https://mtt.thelittlegraduates.in/app/open.php")+'"><input type="hidden" name="token" value="'+B.mm.cL(s)+'"><input type="hidden" name="path" value="'+B.mm.cL(r)+'"></form>\n<script>document.forms[0].submit();</script></body></html>'},
 $S:139}
 A.aWm.prototype={
 $0(){var s,r=this,q=r.b,p=q.c===B.lc?r.c.b:null
