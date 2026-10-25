@@ -40,7 +40,7 @@ def deploy():
     repos = api('VersionControl', 'retrieve')
     if root not in json.dumps(repos.get('data')):
         api('VersionControl', 'create', type='git', name='LittleGraduatesAppWeb',
-            repository_root=root, source_repository='https://github.com/vinodamz/LittleGraduatesApp.git')
+            repository_root=root, source_repository=json.dumps({'remote_name': 'origin', 'url': 'https://github.com/vinodamz/LittleGraduatesApp.git'}))
     api('VersionControl', 'update', repository_root=root, branch='web-release')
     api('VersionControlDeployment', 'create', repository_root=root)
     sha = os.environ['SOURCE_SHA']
