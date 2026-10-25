@@ -30,7 +30,8 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  int _index = 0;
+  String _selectedKey = 'today';
+  final Set<String> _visited = {'today'};
 
   @override
   void initState() {
@@ -54,44 +55,127 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   List<_Tab> _tabs(Session session) {
     final keys = session.modules.map((m) => m.key).toSet();
     return [
-      const _Tab('today', 'Today', Icons.wb_sunny_rounded, TodayScreen()),
+      _Tab(
+        'today',
+        'Today',
+        Icons.wb_sunny_rounded,
+        TodayScreen(active: _selectedKey == 'today'),
+      ),
       if (keys.contains('transport'))
-        const _Tab('transport', 'Transport', Icons.directions_bus_rounded, TransportHubScreen()),
-      if (keys.contains('staff')) const _Tab('staff', 'Staff', Icons.badge_rounded, StaffScreen()),
+        const _Tab(
+          'transport',
+          'Transport',
+          Icons.directions_bus_rounded,
+          TransportHubScreen(),
+        ),
+      if (keys.contains('staff'))
+        const _Tab('staff', 'Staff', Icons.badge_rounded, StaffScreen()),
       if (keys.contains('materials'))
-        const _Tab('materials', 'Materials', Icons.category_rounded, MaterialsScreen()),
-      const _Tab('more', 'More', Icons.grid_view_rounded, MoreScreen()),
+        const _Tab(
+          'materials',
+          'Materials',
+          Icons.category_rounded,
+          MaterialsScreen(),
+        ),
+      const _Tab('more', 'School', Icons.grid_view_rounded, MoreScreen()),
     ];
   }
 
   void _go(List<_Tab> tabs, String key) {
     final next = tabs.indexWhere((t) => t.key == key);
-    if (next >= 0) setState(() => _index = next);
+    if (next >= 0) {
+      setState(() {
+        _selectedKey = key;
+        _visited.add(key);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     final tabs = _tabs(session);
-    final index = _index.clamp(0, tabs.length - 1);
+    final selected = tabs.indexWhere((tab) => tab.key == _selectedKey);
+    final index = selected < 0 ? 0 : selected;
     return LgNav(
       go: (key) => _go(tabs, key),
-      child: Scaffold(
-        body: tabs[index].page,
-        bottomNavigationBar: DecoratedBox(
-          decoration: const BoxDecoration(
-            color: LgColors.surface,
-            border: Border(top: BorderSide(color: LgColors.line)),
-          ),
-          child: NavigationBar(
-            selectedIndex: index,
-            onDestinationSelected: (i) => setState(() => _index = i),
-            destinations: [
-              for (final t in tabs)
-                NavigationDestination(icon: Icon(t.icon), label: t.label),
-            ],
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 840;
+          return Scaffold(
+            body: Row(
+              children: [
+                if (wide)
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: LgColors.surface,
+                      border: Border(right: BorderSide(color: LgColors.line)),
+                    ),
+                    child: SafeArea(
+                      child: NavigationRail(
+                        extended: constraints.maxWidth >= 1200,
+                        backgroundColor: LgColors.surface,
+                        indicatorColor: LgColors.accentSoft,
+                        selectedIndex: index,
+                        onDestinationSelected: (i) => _go(tabs, tabs[i].key),
+                        leading: const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Icon(
+                            Icons.school_outlined,
+                            color: LgColors.accent,
+                            size: 32,
+                          ),
+                        ),
+                        destinations: [
+                          for (final t in tabs)
+                            NavigationRailDestination(
+                              icon: Icon(t.icon),
+                              label: Text(t.label),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1120),
+                      child: IndexedStack(
+                        index: index,
+                        children: [
+                          for (final tab in tabs)
+                            _visited.contains(tab.key)
+                                ? tab.page
+                                : const SizedBox.shrink(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            bottomNavigationBar: wide
+                ? null
+                : DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: LgColors.surface,
+                      border: Border(top: BorderSide(color: LgColors.line)),
+                    ),
+                    child: NavigationBar(
+                      selectedIndex: index,
+                      onDestinationSelected: (i) => _go(tabs, tabs[i].key),
+                      destinations: [
+                        for (final t in tabs)
+                          NavigationDestination(
+                            icon: Icon(t.icon),
+                            label: t.label,
+                          ),
+                      ],
+                    ),
+                  ),
+          );
+        },
       ),
     );
   }

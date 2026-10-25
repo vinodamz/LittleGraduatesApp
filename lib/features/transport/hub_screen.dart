@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/session.dart';
+import '../../core/theme.dart';
 import 'live_screen.dart';
 import 'messages_screen.dart';
 import 'overview_screen.dart';
@@ -37,7 +38,13 @@ class TransportHubScreen extends StatelessWidget {
       length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(admin ? 'Transport desk' : 'Transport'),
+          title: Row(
+            children: [
+              const Icon(Icons.directions_bus_outlined, color: LgColors.accent),
+              const SizedBox(width: 12),
+              Expanded(child: Text(admin ? 'Transport desk' : 'Transport')),
+            ],
+          ),
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
@@ -67,7 +74,8 @@ class _TransportMore extends StatelessWidget {
           leading: const Icon(Icons.school_rounded),
           title: const Text('Arrivals'),
           subtitle: const Text('Handover from the cab to class'),
-          onTap: () => _open(context, 'Arrivals', const RosterScreen(arrivals: true)),
+          onTap: () =>
+              _open(context, 'Arrivals', const RosterScreen(arrivals: true)),
         ),
         ListTile(
           leading: const Icon(Icons.insights_rounded),
@@ -79,13 +87,21 @@ class _TransportMore extends StatelessWidget {
           leading: const Icon(Icons.tune_rounded),
           title: const Text('Settings'),
           subtitle: const Text('Parent alerts, speed and trip history'),
-          onTap: () => _open(context, 'Settings', const TransportSettingsScreen()),
+          onTap: () =>
+              _open(context, 'Settings', const TransportSettingsScreen()),
         ),
       ],
     );
   }
 
   void _open(BuildContext context, String title, Widget page) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: Text(title)), body: page)));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(title)),
+          body: page,
+        ),
+      ),
+    );
   }
 }

@@ -2,27 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:workmanager/workmanager.dart';
+import 'core/platform_init.dart';
 
 import 'core/api_client.dart';
-import 'core/notifications.dart';
 import 'core/session.dart';
 import 'core/theme.dart';
 import 'features/auth/login_screen.dart';
-import 'features/materials/materials_background.dart';
 import 'features/materials/materials_controller.dart';
 import 'features/shell/app_shell.dart';
 import 'features/transport/location_tracker.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Notifications.init();
-  try {
-    await Workmanager().initialize(materialsCallbackDispatcher);
-    await WorkmanagerMaterialsScheduler().ensurePeriodic();
-  } catch (_) {
-    // Desktop and tests have no WorkManager. The in-process queue still runs.
-  }
+  await initializePlatform();
   final api = ApiClient();
   final session = Session(api);
   final tracker = LocationTracker(api);
@@ -82,7 +74,11 @@ class _BootScreen extends StatelessWidget {
             children: [
               Text(
                 'Little Graduates',
-                style: TextStyle(color: LgColors.accent, fontSize: 22, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: LgColors.accent,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               SizedBox(height: 16),
               CircularProgressIndicator(),

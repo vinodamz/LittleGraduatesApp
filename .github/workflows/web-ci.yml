@@ -1,0 +1,82 @@
+name: Web release build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build web --release --dart-define=LG_BASE_URL=https://mtt.thelittlegraduates.in
+      - name: Include Apache hosting configuration
+        run: cp publishing/web.htaccess build/web/.htaccess
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: little-graduates-web-${{ github.sha }}
+          path: build/web/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy:
+    needs: web
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: app-web-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: little-graduates-web-${{ github.sha }}
+          path: release-files
+      - name: Publish the tested static release branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          git init --quiet release-repo
+          git -C release-repo remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          if git -C release-repo ls-remote --exit-code --heads origin web-release; then
+            git -C release-repo fetch --depth=1 origin web-release
+            git -C release-repo checkout -b web-release FETCH_HEAD
+          else
+            git -C release-repo checkout --orphan web-release
+          fi
+          rsync -a --delete --exclude=.git/ release-files/ release-repo/
+          echo "$GITHUB_SHA" > release-repo/build-id.txt
+          cat > release-repo/.cpanel.yml <<'CPANEL'
+          deployment:
+            tasks:
+              - /usr/bin/rsync -av --checksum --no-perms --omit-dir-times --exclude='.git/' --exclude='.cpanel.yml' ./ $HOME/thelittlegraduates.in/app/ > $HOME/last-app-deploy.log 2>&1
+              - /usr/bin/find $HOME/thelittlegraduates.in/app -type d -exec /bin/chmod 755 {} +
+              - /usr/bin/find $HOME/thelittlegraduates.in/app -type f -exec /bin/chmod 644 {} +
+          CPANEL
+          git -C release-repo add --all
+          git -C release-repo -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --allow-empty -m "Deploy app $GITHUB_SHA"
+          git -C release-repo push origin HEAD:web-release
+      - name: Deploy isolated app directory and verify HTTPS
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: python3 scripts/cpanel_web_deploy.py

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -23,7 +23,8 @@ class ApiException implements Exception {
 class ApiClient {
   ApiClient({http.Client? client}) : _http = client ?? http.Client();
 
-  static const userAgent = 'Mozilla/5.0 (Linux; Android) LittleGraduatesApp/1.0';
+  static const userAgent =
+      'Mozilla/5.0 (Linux; Android) LittleGraduatesApp/1.0';
 
   final http.Client _http;
   String? token;
@@ -31,28 +32,34 @@ class ApiClient {
   /// Called when the server says the token is no longer valid.
   void Function()? onUnauthenticated;
 
-  Uri _uri(String path, [Map<String, String>? query]) =>
-      Uri.parse('${AppConfig.baseUrl}/api/v1/$path').replace(queryParameters: query);
+  Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(
+    '${AppConfig.baseUrl}/api/v1/$path',
+  ).replace(queryParameters: query);
 
   Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        // Browser-like agent: the host's bot filter blocks unknown clients.
-        'User-Agent': userAgent,
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    // Browser-like agent: the host's bot filter blocks unknown clients.
+    if (!kIsWeb) 'User-Agent': userAgent,
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   Map<String, String> get _acceptHeaders => {
-        'Accept': 'application/json',
-        'User-Agent': userAgent,
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+    'Accept': 'application/json',
+    if (!kIsWeb) 'User-Agent': userAgent,
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
 
   Future<Map<String, dynamic>> get(String path, [Map<String, String>? query]) =>
       _send(() => _http.get(_uri(path, query), headers: _headers));
 
-  Future<Map<String, dynamic>> post(String path, [Map<String, dynamic>? body]) =>
-      _send(() => _http.post(_uri(path), headers: _headers, body: jsonEncode(body ?? {})));
+  Future<Map<String, dynamic>> post(
+    String path, [
+    Map<String, dynamic>? body,
+  ]) => _send(
+    () =>
+        _http.post(_uri(path), headers: _headers, body: jsonEncode(body ?? {})),
+  );
 
   /// Multipart upload. Used for material photos and videos, which can take
   /// longer than a JSON call.
@@ -66,10 +73,34 @@ class ApiClient {
     request.headers.addAll(_acceptHeaders);
     request.fields.addAll(fields);
     return _send(() async {
-      request.files.add(await http.MultipartFile.fromPath('media', filePath, filename: filename));
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'media',
+          filePath,
+          filename: filename,
+        ),
+      );
       final streamed = await _http.send(request);
       return http.Response.fromStream(streamed);
     }, timeout: const Duration(minutes: 5));
+  }
+
+  Future<Map<String, dynamic>> postMultipartBytes(
+    String path, {
+    required Map<String, String> fields,
+    required List<int> bytes,
+    required String filename,
+  }) {
+    final request = http.MultipartRequest('POST', _uri(path));
+    request.headers.addAll(_acceptHeaders);
+    request.fields.addAll(fields);
+    request.files.add(
+      http.MultipartFile.fromBytes('media', bytes, filename: filename),
+    );
+    return _send(
+      () async => http.Response.fromStream(await _http.send(request)),
+      timeout: const Duration(minutes: 5),
+    );
   }
 
   Future<Map<String, dynamic>> _send(
@@ -79,10 +110,10 @@ class ApiClient {
     http.Response res;
     try {
       res = await request().timeout(timeout);
-    } on SocketException {
-      throw ApiException('No internet connection.');
-    } on HttpException {
-      throw ApiException('Could not reach the school server.');
+    } on http.ClientException {
+      throw ApiException(
+        'Could not reach the school server. Check your connection.',
+      );
     } on TimeoutException {
       throw ApiException('The school server did not respond.');
     } on Exception {
@@ -92,11 +123,15 @@ class ApiClient {
     try {
       data = jsonDecode(res.body) as Map<String, dynamic>;
     } on FormatException {
-      throw ApiException('Unexpected reply from the server (${res.statusCode}).', status: res.statusCode);
+      throw ApiException(
+        'Unexpected reply from the server (${res.statusCode}).',
+        status: res.statusCode,
+      );
     }
     if (res.statusCode >= 400 || data['ok'] != true) {
       final e = ApiException(
-        (data['error'] as String?) ?? 'Something went wrong (${res.statusCode}).',
+        (data['error'] as String?) ??
+            'Something went wrong (${res.statusCode}).',
         status: res.statusCode,
         code: (data['code'] as String?) ?? '',
       );

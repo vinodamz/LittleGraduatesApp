@@ -35,7 +35,9 @@ class StaffAttendanceCard extends StatelessWidget {
     final String detail;
     if (!a.checkedIn) {
       headline = 'Not checked in';
-      detail = a.shiftLabel.isEmpty ? 'Tap once when you arrive.' : 'Shift ${a.shiftLabel}.';
+      detail = a.shiftLabel.isEmpty
+          ? 'Tap once when you arrive.'
+          : 'Shift ${a.shiftLabel}.';
     } else if (!a.checkedOut) {
       headline = 'Checked in at ${a.checkIn}';
       detail = a.statusLabel;
@@ -50,7 +52,32 @@ class StaffAttendanceCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('My attendance', style: TextStyle(color: LgColors.muted, fontWeight: FontWeight.w700)),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: LgColors.accentSoft,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.schedule_outlined,
+                    color: LgColors.accent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'My attendance',
+                    style: TextStyle(
+                      color: LgColors.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             const SizedBox(height: 6),
             Text(headline, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
@@ -70,11 +97,18 @@ class StaffAttendanceCard extends StatelessWidget {
                 child: Text(busy ? 'Checking out…' : 'Check out'),
               )
             else
-              const LgStatusPill(label: 'Attendance done', foreground: LgColors.ok, background: LgColors.okBg),
+              const LgStatusPill(
+                label: 'Attendance done',
+                foreground: LgColors.ok,
+                background: LgColors.okBg,
+              ),
             if (onOpen != null)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton(onPressed: onOpen, child: const Text('Open staff')),
+                child: TextButton(
+                  onPressed: onOpen,
+                  child: const Text('Open staff'),
+                ),
               ),
           ],
         ),
@@ -124,7 +158,9 @@ class _StaffScreenState extends State<StaffScreen> {
       final day = await _api.check(op);
       if (!mounted) return;
       setState(() => _day = day);
-      final at = op == 'self_in' ? day.attendance.checkIn : day.attendance.checkOut;
+      final at = op == 'self_in'
+          ? day.attendance.checkIn
+          : day.attendance.checkOut;
       _snack(op == 'self_in' ? 'Checked in at $at.' : 'Checked out at $at.');
     } on ApiException catch (e) {
       if (mounted) _snack(e.message);
@@ -134,11 +170,15 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _open(String url, String label) async {
-    final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    final ok = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
     if (!ok && mounted) _snack('Could not open $label.');
   }
 
@@ -166,7 +206,10 @@ class _StaffScreenState extends State<StaffScreen> {
         title: const Text('Before this is approved'),
         content: Text(result.notice),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+          FilledButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -177,10 +220,18 @@ class _StaffScreenState extends State<StaffScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Cancel this request?'),
-        content: Text('${request.typeLabel} · ${formatDateRange(request.startDate, request.endDate)}'),
+        content: Text(
+          '${request.typeLabel} · ${formatDateRange(request.startDate, request.endDate)}',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Keep it')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Cancel request')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Cancel request'),
+          ),
         ],
       ),
     );
@@ -215,10 +266,23 @@ class _StaffScreenState extends State<StaffScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
+            Text(
+              'People & attendance',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Check in, plan leave, and see who’s here.',
+              style: TextStyle(color: LgColors.muted),
+            ),
+            const SizedBox(height: 16),
             if (day != null)
               Text(day.dateLabel, style: const TextStyle(color: LgColors.muted))
             else
-              Text(formatLongDate(DateTime.now()), style: const TextStyle(color: LgColors.muted)),
+              Text(
+                formatLongDate(DateTime.now()),
+                style: const TextStyle(color: LgColors.muted),
+              ),
             const SizedBox(height: 12),
             if (_error != null) ...[
               Semantics(
@@ -234,7 +298,10 @@ class _StaffScreenState extends State<StaffScreen> {
               FilledButton(onPressed: _load, child: const Text('Try again')),
               if (_website != null) ...[
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: () => _open(_website!, 'staff'), child: const Text('Open staff website')),
+                OutlinedButton(
+                  onPressed: () => _open(_website!, 'staff'),
+                  child: const Text('Open staff website'),
+                ),
               ],
             ] else if (day == null)
               const Padding(
@@ -249,7 +316,14 @@ class _StaffScreenState extends State<StaffScreen> {
                 onCheckOut: () => _check('self_out'),
               ),
               const SizedBox(height: 16),
-              if (day.leave != null) _LeaveCard(leave: day.leave!, busy: _busy, onApply: _apply, onCancel: _cancel, onReview: () => _open(day.links.leave, 'leave')),
+              if (day.leave != null)
+                _LeaveCard(
+                  leave: day.leave!,
+                  busy: _busy,
+                  onApply: _apply,
+                  onCancel: _cancel,
+                  onReview: () => _open(day.links.leave, 'leave'),
+                ),
               const SizedBox(height: 16),
               _DutiesCard(
                 pending: day.dutiesPending,
@@ -268,7 +342,10 @@ class _StaffScreenState extends State<StaffScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text('Payroll, documents and messages stay on the school website.', style: TextStyle(height: 1.4)),
+                      const Text(
+                        'Payroll, documents and messages stay on the school website.',
+                        style: TextStyle(height: 1.4),
+                      ),
                       const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: () => _open(day.links.staff, 'staff'),
@@ -309,9 +386,18 @@ class _LeaveCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('My leave', style: TextStyle(color: LgColors.muted, fontWeight: FontWeight.w700)),
+            const Text(
+              'My leave',
+              style: TextStyle(
+                color: LgColors.muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(leave.balanceLabel, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              leave.balanceLabel,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const Text('available', style: TextStyle(color: LgColors.muted)),
             if (leave.pending > 0) ...[
               const SizedBox(height: 8),
@@ -327,19 +413,30 @@ class _LeaveCard extends StatelessWidget {
             if (leave.pendingReviews > 0) ...[
               const SizedBox(height: 12),
               LgNotice(
-                message: '${leave.pendingReviews} ${leave.pendingReviews == 1 ? 'request is' : 'requests are'} waiting for a decision.',
+                message:
+                    '${leave.pendingReviews} ${leave.pendingReviews == 1 ? 'request is' : 'requests are'} waiting for a decision.',
                 foreground: LgColors.info,
                 background: LgColors.infoBg,
                 icon: Icons.inbox_rounded,
               ),
               const SizedBox(height: 8),
-              OutlinedButton(onPressed: onReview, child: const Text('Review on the website')),
+              OutlinedButton(
+                onPressed: onReview,
+                child: const Text('Review on the website'),
+              ),
             ],
             const SizedBox(height: 12),
-            FilledButton(onPressed: busy ? null : onApply, child: const Text('Apply for leave')),
+            FilledButton(
+              onPressed: busy ? null : onApply,
+              child: const Text('Apply for leave'),
+            ),
             if (leave.requests.isNotEmpty) ...[
               const SizedBox(height: 8),
-              for (final r in leave.requests) _LeaveRow(request: r, onCancel: r.pending && !busy ? () => onCancel(r) : null),
+              for (final r in leave.requests)
+                _LeaveRow(
+                  request: r,
+                  onCancel: r.pending && !busy ? () => onCancel(r) : null,
+                ),
             ],
           ],
         ),
@@ -382,7 +479,11 @@ class _LeaveRow extends StatelessWidget {
               ],
             ),
           ),
-          LgStatusPill(label: request.statusLabel, foreground: fg, background: bg),
+          LgStatusPill(
+            label: request.statusLabel,
+            foreground: fg,
+            background: bg,
+          ),
           if (onCancel != null)
             IconButton(
               tooltip: 'Cancel request',
@@ -410,14 +511,23 @@ class _DutiesCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('My duties', style: TextStyle(color: LgColors.muted, fontWeight: FontWeight.w700)),
+            const Text(
+              'My duties',
+              style: TextStyle(
+                color: LgColors.muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               clear ? 'Caught up' : '$pending still to tick',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-            OutlinedButton(onPressed: onOpen, child: Text(clear ? 'Open duty list' : 'Tick them')),
+            OutlinedButton(
+              onPressed: onOpen,
+              child: Text(clear ? 'Open duty list' : 'Tick them'),
+            ),
           ],
         ),
       ),
@@ -426,7 +536,11 @@ class _DutiesCard extends StatelessWidget {
 }
 
 class _RosterSection extends StatelessWidget {
-  const _RosterSection({required this.people, required this.filter, required this.onFilter});
+  const _RosterSection({
+    required this.people,
+    required this.filter,
+    required this.onFilter,
+  });
 
   final List<RosterPerson> people;
   final _RosterFilter filter;
@@ -474,7 +588,10 @@ class _RosterSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         if (shown.isEmpty)
-          const LgEmptyState(icon: Icons.groups_rounded, title: 'No one in this list')
+          const LgEmptyState(
+            icon: Icons.groups_rounded,
+            title: 'No one in this list',
+          )
         else
           for (final p in shown) ...[
             _RosterRow(person: p),
@@ -519,7 +636,10 @@ class _RosterRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(person.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    person.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   Text(
                     [person.roleLabel, if (times.isNotEmpty) times].join(' · '),
                     style: const TextStyle(color: LgColors.muted, fontSize: 13),
@@ -528,7 +648,11 @@ class _RosterRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            LgStatusPill(label: person.statusLabel, foreground: fg, background: bg),
+            LgStatusPill(
+              label: person.statusLabel,
+              foreground: fg,
+              background: bg,
+            ),
           ],
         ),
       ),
@@ -627,22 +751,34 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
               child: Container(
                 width: 40,
                 height: 4,
-                decoration: BoxDecoration(color: LgColors.line, borderRadius: BorderRadius.circular(4)),
+                decoration: BoxDecoration(
+                  color: LgColors.line,
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ),
             const SizedBox(height: 16),
-            Text('Apply for leave', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Apply for leave',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 4),
-            Text('${widget.leave.balanceLabel} available', style: const TextStyle(color: LgColors.muted)),
+            Text(
+              '${widget.leave.balanceLabel} available',
+              style: const TextStyle(color: LgColors.muted),
+            ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               key: ValueKey(_type),
               initialValue: _type,
               decoration: const InputDecoration(labelText: 'Type'),
               items: [
-                for (final t in widget.leave.types) DropdownMenuItem(value: t.key, child: Text(t.label)),
+                for (final t in widget.leave.types)
+                  DropdownMenuItem(value: t.key, child: Text(t.label)),
               ],
-              onChanged: _busy ? null : (v) => setState(() => _type = v ?? _type),
+              onChanged: _busy
+                  ? null
+                  : (v) => setState(() => _type = v ?? _type),
             ),
             const SizedBox(height: 12),
             Row(
@@ -657,9 +793,21 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
               Wrap(
                 spacing: 8,
                 children: [
-                  ChoiceChip(label: const Text('Full day'), selected: _half == '', onSelected: (_) => setState(() => _half = '')),
-                  ChoiceChip(label: const Text('Morning'), selected: _half == 'first', onSelected: (_) => setState(() => _half = 'first')),
-                  ChoiceChip(label: const Text('Afternoon'), selected: _half == 'second', onSelected: (_) => setState(() => _half = 'second')),
+                  ChoiceChip(
+                    label: const Text('Full day'),
+                    selected: _half == '',
+                    onSelected: (_) => setState(() => _half = ''),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Morning'),
+                    selected: _half == 'first',
+                    onSelected: (_) => setState(() => _half = 'first'),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Afternoon'),
+                    selected: _half == 'second',
+                    onSelected: (_) => setState(() => _half = 'second'),
+                  ),
                 ],
               ),
             ],
@@ -669,7 +817,10 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
               minLines: 2,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Reason (optional)', alignLabelWithHint: true),
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                alignLabelWithHint: true,
+              ),
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -684,7 +835,10 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
               ),
             ],
             const SizedBox(height: 16),
-            FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? 'Sending…' : 'Submit request')),
+            FilledButton(
+              onPressed: _busy ? null : _submit,
+              child: Text(_busy ? 'Sending…' : 'Submit request'),
+            ),
           ],
         ),
       ),
@@ -696,7 +850,14 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
       onPressed: _busy ? null : onTap,
       child: Column(
         children: [
-          Text(label, style: const TextStyle(color: LgColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: LgColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Text(formatShortDate(ymd(date))),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -14,12 +15,14 @@ class Notifications {
   static const _channel = AndroidNotificationDetails(
     'trip_alerts',
     'Trip alerts',
-    channelDescription: 'When a family is about 5 minutes away or the cab has reached them',
+    channelDescription:
+        'When a family is about 5 minutes away or the cab has reached them',
     importance: Importance.high,
     priority: Priority.high,
   );
 
   static Future<void> init() async {
+    if (kIsWeb) return;
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -33,20 +36,30 @@ class Notifications {
   }
 
   static Future<void> requestPermission() async {
+    if (kIsWeb) return;
     await _plugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
   }
 
-  static Future<void> show(int id, String title, String body, {String? payload}) => _plugin.show(
-        id: id,
-        title: title,
-        body: body,
-        notificationDetails: const NotificationDetails(
-          android: _channel,
-          iOS: DarwinNotificationDetails(),
-          linux: LinuxNotificationDetails(),
-        ),
-        payload: payload,
-      );
+  static Future<void> show(
+    int id,
+    String title,
+    String body, {
+    String? payload,
+  }) => kIsWeb
+      ? Future<void>.value()
+      : _plugin.show(
+          id: id,
+          title: title,
+          body: body,
+          notificationDetails: const NotificationDetails(
+            android: _channel,
+            iOS: DarwinNotificationDetails(),
+            linux: LinuxNotificationDetails(),
+          ),
+          payload: payload,
+        );
 }
