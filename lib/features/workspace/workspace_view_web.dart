@@ -73,7 +73,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         ..border = '0'
         ..width = '100%'
         ..height = '100%';
-      frame.setAttribute('referrerpolicy', 'no-referrer');
+      // no-referrer makes form POSTs send Origin: null, which MTT rejects.
+      // Send only the app origin; credentials remain in the HTTPS POST body.
+      frame.setAttribute('referrerpolicy', 'strict-origin');
       // MTT Materials has voice notes; access still requires browser consent.
       frame.setAttribute(
         'allow',

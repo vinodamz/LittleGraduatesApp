@@ -14,6 +14,8 @@ checks and the browser outbox retain their existing behavior.
 The Flutter web app embeds a sandboxed MTT iframe; Android/iOS use the official
 Flutter WebView plugin. Both bootstrap with an HTTPS form POST to `/app/open.php`.
 The bearer token is never included in a URL or handed to external destinations.
+The bootstrap and iframe use `strict-origin`: `no-referrer` would make form POSTs
+send `Origin: null`, causing MTT to reject the handoff.
 The bridge regenerates the PHP session and CSRF state, stores only the token ID,
 and redirects to a validated local school page. Each request checks token
 revocation and user activation. No new database table is required.
@@ -46,3 +48,7 @@ a mobile store release. Web publication does not create a mobile release.
   out MTT `assets/js/app-workspace.js`. Without the latter, the test fetches the
   deployed bridge script. Test records and endpoint responses are fixtures; it
   never signs into a real staff account or writes a school record.
+
+Set `LG_VERIFY_REAL_BRIDGE=1` for the browser smoke test to also send the invalid
+fixture token to the live MTT bridge. It must receive 401 (invalid login), never
+403 `origin_denied`. No real staff login or record is used.
