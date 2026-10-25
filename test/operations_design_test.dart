@@ -114,6 +114,13 @@ Widget _app({double scale = 1, bool failStaff = false}) {
 
 Future<void> _capture(WidgetTester tester, String name) async {
   if (!const bool.fromEnvironment('LG_DESIGN_PREVIEWS')) return;
+  await tester.runAsync(
+    () => precacheImage(
+      const AssetImage('assets/brand/logo.png'),
+      tester.element(find.byType(AppShell)),
+    ),
+  );
+  await tester.pumpAndSettle();
   final boundary = tester.firstRenderObject<RenderRepaintBoundary>(
     find.byKey(const Key('preview')),
   );
@@ -129,9 +136,11 @@ Future<void> _capture(WidgetTester tester, String name) async {
 
 void main() {
   setUpAll(() async {
-    final font = FontLoader('Inter')
-      ..addFont(rootBundle.load('assets/fonts/Inter.ttf'));
-    await font.load();
+    for (final family in ['Nunito', 'Baloo2']) {
+      final font = FontLoader(family)
+        ..addFont(rootBundle.load('assets/fonts/$family.ttf'));
+      await font.load();
+    }
     final icons = FontLoader('MaterialIcons')
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();

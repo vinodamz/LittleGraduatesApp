@@ -8,6 +8,7 @@ import '../../core/nav.dart';
 import '../../core/privacy.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
+import '../../core/school_logo.dart';
 import '../../core/widgets.dart';
 import '../materials/materials_controller.dart';
 import '../staff/staff_api.dart';
@@ -168,7 +169,7 @@ class _TodayScreenState extends State<TodayScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            const Icon(Icons.school_outlined, color: LgColors.accent),
+            const SchoolLogo(size: 44),
             const SizedBox(width: 10),
             Flexible(child: Text(session.school)),
           ],
@@ -191,7 +192,7 @@ class _TodayScreenState extends State<TodayScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: LgColors.ink,
+                color: LgColors.indigo,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Column(

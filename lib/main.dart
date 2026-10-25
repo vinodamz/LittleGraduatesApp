@@ -7,6 +7,7 @@ import 'core/platform_init.dart';
 import 'core/api_client.dart';
 import 'core/session.dart';
 import 'core/theme.dart';
+import 'core/school_logo.dart';
 import 'features/auth/login_screen.dart';
 import 'features/materials/materials_controller.dart';
 import 'features/shell/app_shell.dart';
@@ -75,6 +76,8 @@ class _BootScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              SchoolLogo(size: 92),
+              SizedBox(height: 16),
               Text(
                 'Little Graduates',
                 style: TextStyle(
