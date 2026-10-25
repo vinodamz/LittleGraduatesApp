@@ -52,6 +52,21 @@ jobs:
           git -C release-repo add --all
           git -C release-repo -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --allow-empty -m "Deploy app $SOURCE_SHA"
           git -C release-repo push origin HEAD:web-release
+      - name: Initialize cPanel Git repository
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_TOKEN }}
+        run: |
+          python3 - <<'PYCODE'
+          import sys, os, json
+          sys.path.insert(0, 'scripts')
+          from cpanel_web_deploy import api
+          root = '/home/' + os.environ['CPANEL_USER'] + '/repos/LittleGraduatesAppWeb'
+          if root not in json.dumps(api('VersionControl', 'retrieve').get('data')):
+              result = api('VersionControl', 'create', type='git', name='LittleGraduatesAppWeb', repository_root=root, source_repository=json.dumps({'remote_name': 'origin', 'url': 'https://github.com/vinodamz/LittleGraduatesApp.git'}))
+              print('cPanel Git clone initialized:', result.get('status'))
+          PYCODE
       - name: Deploy isolated app directory and verify HTTPS
         env:
           CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
