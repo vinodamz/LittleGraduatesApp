@@ -23,6 +23,8 @@ Messages are accepted only from the expected frame and exact MTT origin. The app
 checks the displayed user identity. Close returns to the Flutter screen; Previous
 page traverses the tool's own history. Loading has a timeout and a retry screen.
 MTT hides its duplicate global bar but retains each module's navigation and forms.
+The web iframe delegates microphone access only to MTT for Materials voice notes;
+the browser still requires the user to grant recording permission.
 
 The browser workspace uses MTT's existing session cookie on the MTT host. Opening
 a tool synchronizes that website session to the app's selected account; older

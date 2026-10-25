@@ -74,6 +74,11 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         ..width = '100%'
         ..height = '100%';
       frame.setAttribute('referrerpolicy', 'no-referrer');
+      // MTT Materials has voice notes; access still requires browser consent.
+      frame.setAttribute(
+        'allow',
+        'microphone ${Uri.parse(AppConfig.baseUrl).origin}',
+      );
       frame.setAttribute(
         'sandbox',
         'allow-scripts allow-same-origin allow-forms allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox',
