@@ -1,34 +1,61 @@
-name: Promote Android to production
+name: Publish validated web artifact
 on:
   workflow_dispatch:
-    inputs:
-      version_code:
-        description: Existing version code tested on the internal track
-        required: true
-        type: string
 permissions:
   contents: read
-concurrency:
-  group: google-play-release
-  cancel-in-progress: false
+  actions: read
 jobs:
-  promote:
-    if: github.ref == 'refs/heads/main'
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: google-play-production
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: app-web-production
+      cancel-in-progress: false
+    env:
+      SOURCE_SHA: c6a2802507fbd8d92909029d8d2f5af896eeb63a
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Require production environment protection
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: c6a2802507fbd8d92909029d8d2f5af896eeb63a
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: little-graduates-web-bda55749d031a43eaf5c1c457ea81fd4c0cf901f
+          run-id: 40158451656
+          github-token: ${{ github.token }}
+          path: release-files
+      - name: Publish the tested static release branch
         env:
-          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error "https://api.github.com/repos/$GH_REPO/environments/google-play-production" > "$RUNNER_TEMP/protection.json"
-          python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); r=e.get("protection_rules", []); assert e.get("can_admins_bypass") is False, "Administrator bypass must be disabled"; assert any(x.get("type")=="required_reviewers" and x.get("reviewers") for x in r), "Production requires at least one environment reviewer"' "$RUNNER_TEMP/protection.json"
-      - run: python3 -m pip install -r scripts/requirements-play.txt
-      - name: Promote tested version
+          gh auth setup-git
+          git init --quiet release-repo
+          git -C release-repo remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          if git -C release-repo ls-remote --exit-code --heads origin web-release; then
+            git -C release-repo fetch --depth=1 origin web-release
+            git -C release-repo checkout -b web-release FETCH_HEAD
+          else
+            git -C release-repo checkout --orphan web-release
+          fi
+          rsync -a --delete --exclude=.git/ release-files/ release-repo/
+          echo "$SOURCE_SHA" > release-repo/build-id.txt
+          cat > release-repo/.cpanel.yml <<'CPANEL'
+          deployment:
+            tasks:
+              - /usr/bin/rsync -av --checksum --no-perms --omit-dir-times --exclude='.git/' --exclude='.cpanel.yml' ./ $HOME/thelittlegraduates.in/app/ > $HOME/last-app-deploy.log 2>&1
+              - /usr/bin/find $HOME/thelittlegraduates.in/app -type d -exec /bin/chmod 755 {} +
+              - /usr/bin/find $HOME/thelittlegraduates.in/app -type f -exec /bin/chmod 644 {} +
+          CPANEL
+          git -C release-repo add --all
+          git -C release-repo -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit --allow-empty -m "Deploy app $SOURCE_SHA"
+          git -C release-repo push origin HEAD:web-release
+      - name: Deploy isolated app directory and verify HTTPS
         env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          VERSION_CODE: ${{ inputs.version_code }}
-        run: python3 scripts/play_release.py promote --version-code "$VERSION_CODE"
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_TOKEN: ${{ secrets.CPANEL_TOKEN }}
+          SOURCE_SHA: c6a2802507fbd8d92909029d8d2f5af896eeb63a
+        run: python3 scripts/cpanel_web_deploy.py
