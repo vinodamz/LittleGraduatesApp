@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../core/module_registry.dart';
 
 import '../../core/api_client.dart';
 import '../../core/format.dart';
@@ -170,16 +170,14 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _open(String url, String label) async {
-    final ok = await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!ok && mounted) _snack('Could not open $label.');
+    await openWebUrl(context, url, label);
+    if (mounted) await _load();
   }
 
   Future<void> _apply() async {
@@ -300,7 +298,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () => _open(_website!, 'staff'),
-                  child: const Text('Open staff website'),
+                  child: const Text('Staff tools'),
                 ),
               ],
             ] else if (day == null)
@@ -343,13 +341,13 @@ class _StaffScreenState extends State<StaffScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
-                        'Payroll, documents and messages stay on the school website.',
+                        'Manage payroll, documents and messages here.',
                         style: TextStyle(height: 1.4),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: () => _open(day.links.staff, 'staff'),
-                        child: const Text('Open staff website'),
+                        child: const Text('Staff tools'),
                       ),
                     ],
                   ),
@@ -422,7 +420,7 @@ class _LeaveCard extends StatelessWidget {
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: onReview,
-                child: const Text('Review on the website'),
+                child: const Text('Review leave'),
               ),
             ],
             const SizedBox(height: 12),

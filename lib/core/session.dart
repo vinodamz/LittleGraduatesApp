@@ -6,8 +6,11 @@ import 'api_client.dart';
 class AppUser {
   AppUser({required this.id, required this.name, required this.role});
 
-  factory AppUser.fromJson(Map<String, dynamic> j) =>
-      AppUser(id: j['id'] as int, name: j['name'] as String, role: j['role'] as String);
+  factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
+    id: j['id'] as int,
+    name: j['name'] as String,
+    role: j['role'] as String,
+  );
 
   final int id;
   final String name;
@@ -17,16 +20,21 @@ class AppUser {
 }
 
 /// One tile on the home screen. `native` modules have screens in the app;
-/// the rest open the matching MTT web page.
+/// the rest use the authenticated in-app school workspace.
 class AppModule {
-  AppModule({required this.key, required this.label, required this.native, required this.webUrl});
+  AppModule({
+    required this.key,
+    required this.label,
+    required this.native,
+    required this.webUrl,
+  });
 
   factory AppModule.fromJson(Map<String, dynamic> j) => AppModule(
-        key: j['key'] as String,
-        label: j['label'] as String,
-        native: j['native'] as bool,
-        webUrl: j['web_url'] as String,
-      );
+    key: j['key'] as String,
+    label: j['label'] as String,
+    native: j['native'] as bool,
+    webUrl: j['web_url'] as String,
+  );
 
   final String key;
   final String label;
@@ -72,18 +80,28 @@ class Session extends ChangeNotifier {
     final d = await api.get('me.php');
     user = AppUser.fromJson(d['user'] as Map<String, dynamic>);
     school = (d['school'] as String?) ?? school;
-    modules = [for (final m in d['modules'] as List) AppModule.fromJson(m as Map<String, dynamic>)];
+    modules = [
+      for (final m in d['modules'] as List)
+        AppModule.fromJson(m as Map<String, dynamic>),
+    ];
     state = SessionState.signedIn;
     notifyListeners();
   }
 
   Future<void> signIn(int userId, String pin, String deviceName) async {
-    final d = await api.post('login.php', {'user_id': userId, 'pin': pin, 'device_name': deviceName});
+    final d = await api.post('login.php', {
+      'user_id': userId,
+      'pin': pin,
+      'device_name': deviceName,
+    });
     final token = d['token'] as String;
     await _storage.write(key: _tokenKey, value: token);
     api.token = token;
     user = AppUser.fromJson(d['user'] as Map<String, dynamic>);
-    modules = [for (final m in d['modules'] as List) AppModule.fromJson(m as Map<String, dynamic>)];
+    modules = [
+      for (final m in d['modules'] as List)
+        AppModule.fromJson(m as Map<String, dynamic>),
+    ];
     state = SessionState.signedIn;
     notifyListeners();
   }

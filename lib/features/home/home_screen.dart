@@ -415,7 +415,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       ? 'No trips today'
                       : 'Trips are finished',
                   message: _trips!.isEmpty
-                      ? 'An admin can add cabs and routes on the website under Transport.'
+                      ? 'An admin can add cabs and routes in Transport tools.'
                       : 'Open Transport if you need to review a finished run.',
                 )
               else
@@ -766,7 +766,7 @@ String moduleDescription(String key, bool inApp) => switch (key) {
   'plans' => 'Planning & class schedules',
   'daycare' => 'Daycare routines & records',
   'recruitment' => 'Candidates & hiring',
-  _ => inApp ? 'Open school tool' : 'Continue on the school website',
+  _ => inApp ? 'Open school tool' : 'Open school tool',
 };
 
 class _OverviewTile extends StatelessWidget {

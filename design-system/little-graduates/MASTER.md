@@ -22,7 +22,7 @@ The implementation source of truth is `lib/core/theme.dart`.
 - Staff: attendance, leave, duties, and roster.
 - Materials: daily completion progress, upload state, search and shelf filter, shelf checks.
 - School: searchable directory of every permitted module, user profile, privacy, and sign-out.
-- Native tools open in their tab; external tools retain an external-link indicator and open their existing website URL.
+- Native tools open in their tab. Other school tools open in the shared authenticated workspace with Close, Previous page, loading feedback, and retry. Keep MTT module navigation and forms; hide the duplicate global header. External contact actions remain external.
 
 ## Responsive behavior
 Bottom navigation on phones; navigation rail at 840px; expanded rail at 1200px. Bound main content to 1120px, login to 560px. Summary cards use three columns at standard text sizes and reflow for large text; shortcuts wrap; no fixed-height text cards. Preserve visited tabs so changing sections does not discard searches or scroll position. Load sections only when first visited.
