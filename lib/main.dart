@@ -20,12 +20,15 @@ Future<void> main() async {
   final tracker = LocationTracker(api);
   final materials = await MaterialsController.open(api);
   String? seenToken;
+  int? seenUserId;
   var haveToken = false;
   session.addListener(() {
     final token = session.state == SessionState.signedIn ? api.token : null;
-    if (haveToken && token == seenToken) return;
+    final userId = session.user?.id;
+    if (haveToken && token == seenToken && userId == seenUserId) return;
     haveToken = true;
     seenToken = token;
+    seenUserId = userId;
     unawaited(materials.rememberToken(token));
   });
   runApp(
