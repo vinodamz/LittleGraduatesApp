@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -36,7 +37,9 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         'LGWorkspace',
         onMessageReceived: (message) {
           try {
-            final data = jsonDecode(message.message) as Map<String, dynamic>;
+            final decoded = jsonDecode(message.message);
+            if (decoded is! Map<String, dynamic>) return;
+            final data = decoded;
             if (mounted && data['type'] == 'lg-workspace') widget.onEvent(data);
           } on FormatException {
             /* Ignore malformed page messages. */
@@ -71,9 +74,17 @@ class _WorkspaceViewState extends State<WorkspaceView> {
         ),
       );
     widget.actions.back = () => _controller.runJavaScript('history.back()');
-    _controller.loadHtmlString(
-      workspaceBootstrap(widget.token, widget.path),
-      baseUrl: AppConfig.baseUrl,
+    _controller.loadRequest(
+      Uri.parse('${AppConfig.baseUrl}/app/open.php'),
+      method: LoadRequestMethod.post,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: Uint8List.fromList(
+        utf8.encode(
+          Uri(
+            queryParameters: {'token': widget.token, 'path': widget.path},
+          ).query,
+        ),
+      ),
     );
   }
 

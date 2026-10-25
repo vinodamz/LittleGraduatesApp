@@ -29,7 +29,7 @@ const assert = require('node:assert/strict');
    const data=new URLSearchParams(req.postData());
    assert.equal(data.get('token'),'a'.repeat(64));
    posts.push(data.get('path'));
-   await route.fulfill({status:303,headers:{location:mtt+data.get('path')}});
+   await route.fulfill({status:200,contentType:'text/html',body:'<script>location.replace('+JSON.stringify(mtt+data.get('path'))+')</script>'});
   });
   await context.route(mtt+'/assets/js/app-workspace.js', route => route.fulfill({contentType:'application/javascript',body:script}));
   for (const prefix of [...modules.map(m=>new URL(m.web_url).pathname.split('/')[1]),'duties']) {
@@ -50,10 +50,11 @@ const assert = require('node:assert/strict');
   await page.getByRole('button',{name:'OK',exact:true}).click();
   await page.getByRole('button',{name:/School Tab/}).click();
   await page.waitForTimeout(700);
-  await page.screenshot({path:'build/workspace-debug.png'});
   for(const module of modules) {
    console.log('Checking '+module.label);
+   await page.getByRole('textbox',{name:'Search school tools'}).fill(module.label);
    await page.getByRole('button',{name:new RegExp('^'+module.label+' ')}).click();
+   await page.waitForTimeout(800);
    const frame=page.frameLocator('iframe[title="School tool"]');
    await frame.getByRole('heading').waitFor();
    await page.getByRole('progressbar').waitFor({state:'hidden'});
@@ -67,6 +68,7 @@ const assert = require('node:assert/strict');
   assert.equal(posts.length,11);
   // Narrow layout and a failed connection must leave a usable Close/Retry screen.
   await page.setViewportSize({width:375,height:812});
+  await page.getByRole('textbox',{name:'Search school tools'}).fill('Fees');
   await page.getByRole('button',{name:/^Fees Fee records/}).click();
   await page.frameLocator('iframe[title="School tool"]').getByRole('heading').waitFor();
   await page.getByRole('progressbar').waitFor({state:'hidden'});

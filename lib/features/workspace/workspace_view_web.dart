@@ -6,6 +6,11 @@ import 'package:web/web.dart' as web;
 import '../../core/config.dart';
 import 'workspace_contract.dart';
 
+// Dart object equality can inspect cross-origin Window properties. Compare
+// the underlying browser objects directly instead.
+@JS('Object.is')
+external bool _sameWindow(JSAny? a, JSAny? b);
+
 class WorkspaceView extends StatefulWidget {
   const WorkspaceView({
     required this.token,
@@ -34,7 +39,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
       final frame = _frame;
       if (frame == null ||
           event.origin != Uri.parse(AppConfig.baseUrl).origin ||
-          event.source != frame.contentWindow) {
+          !_sameWindow(event.source, frame.contentWindow)) {
         return;
       }
       final raw = event.data.dartify();
