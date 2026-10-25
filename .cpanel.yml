@@ -1,0 +1,5 @@
+deployment:
+  tasks:
+    - /usr/bin/rsync -av --checksum --no-perms --omit-dir-times --exclude='.git/' --exclude='.cpanel.yml' ./ $HOME/thelittlegraduates.in/app/ > $HOME/last-app-deploy.log 2>&1
+    - /usr/bin/find $HOME/thelittlegraduates.in/app -type d -exec /bin/chmod 755 {} +
+    - /usr/bin/find $HOME/thelittlegraduates.in/app -type f -exec /bin/chmod 644 {} +
