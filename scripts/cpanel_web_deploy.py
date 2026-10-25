@@ -49,6 +49,7 @@ def deploy():
             url = 'https://app.thelittlegraduates.in/build-id.txt?release=' + sha
             with urllib.request.urlopen(url, timeout=15) as response:
                 if response.read().decode().strip() == sha:
+                    api('SSL', 'toggle_ssl_redirect_for_domains', domains='app.thelittlegraduates.in', state=1)
                     print('Verified HTTPS web release:', sha)
                     return
         except (urllib.error.URLError, UnicodeError):

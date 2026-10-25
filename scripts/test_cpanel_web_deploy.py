@@ -16,7 +16,7 @@ class WebDeploymentTests(unittest.TestCase):
     def test_existing_repository_deploys_web_branch_and_verifies_https_sha(self):
         root = '/home/school/repos/LittleGraduatesAppWeb'
         responses = [{'data': {'documentroot': '/home/school/thelittlegraduates.in/app'}},
-                     {'data': [{'repository_root': root}]}, {'status': 1}, {'status': 1}]
+                     {'data': [{'repository_root': root}]}, {'status': 1}, {'status': 1}, {'status': 1}]
         with patch.dict(os.environ, {'CPANEL_USER': 'school', 'SOURCE_SHA': 'release'}), patch.object(deployment, 'api', side_effect=responses) as api, patch.object(deployment.urllib.request, 'urlopen', return_value=io.BytesIO(b'release')) as request:
             deployment.deploy()
             self.assertEqual(api.call_args_list[2].args, ('VersionControl', 'update'))
