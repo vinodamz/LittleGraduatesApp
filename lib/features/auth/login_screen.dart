@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -55,7 +56,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _school = (d['school'] as String?) ?? _school;
         _users = [
           for (final u in d['users'] as List)
-            _LoginUser(u['id'] as int, u['name'] as String, u['role'] as String),
+            _LoginUser(
+              u['id'] as int,
+              u['name'] as String,
+              u['role'] as String,
+            ),
         ];
       });
     } on ApiException catch (e) {
@@ -72,64 +77,122 @@ class _LoginScreenState extends State<LoginScreen> {
     ];
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _load,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-            children: [
-              Text(
-                _school,
-                style: const TextStyle(color: LgColors.accent, fontWeight: FontWeight.w700, letterSpacing: 0.2),
-              ),
-              const SizedBox(height: 8),
-              Text('Who’s here?', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 6),
-              const Text('Tap your name, then enter your PIN.', style: TextStyle(color: LgColors.muted, height: 1.4)),
-              const SizedBox(height: 8),
-              const Align(alignment: Alignment.centerLeft, child: PrivacyPolicyButton()),
-              const SizedBox(height: 8),
-              if (_error != null) ...[
-                Semantics(
-                  liveRegion: true,
-                  child: LgNotice(
-                    message: _error!,
-                    foreground: LgColors.danger,
-                    background: LgColors.dangerBg,
-                    icon: Icons.error_outline_rounded,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                FilledButton(onPressed: _load, child: const Text('Try again')),
-              ] else if (_users == null)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else ...[
-                if (_users!.length > 6) ...[
-                  TextField(
-                    controller: _search,
-                    textInputAction: TextInputAction.search,
-                    decoration: const InputDecoration(
-                      hintText: 'Find your name',
-                      prefixIcon: Icon(Icons.search_rounded),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: LgColors.ink,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.school_outlined,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          _school,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'School operations workspace',
+                          style: TextStyle(
+                            color: Color(0xFFE2DBE8),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-                if (users.isEmpty)
-                  const LgEmptyState(
-                    icon: Icons.person_search_rounded,
-                    title: 'No one matches that name',
-                    message: 'Check the spelling, or clear the search.',
-                  )
-                else
-                  for (final u in users) ...[
-                    _PersonTile(user: u),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'STAFF WORKSPACE',
+                    style: TextStyle(
+                      color: LgColors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Who’s here?',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Tap your name, then enter your PIN.',
+                    style: TextStyle(color: LgColors.muted, height: 1.4),
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: PrivacyPolicyButton(),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_error != null) ...[
+                    Semantics(
+                      liveRegion: true,
+                      child: LgNotice(
+                        message: _error!,
+                        foreground: LgColors.danger,
+                        background: LgColors.dangerBg,
+                        icon: Icons.error_outline_rounded,
+                      ),
+                    ),
                     const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: _load,
+                      child: const Text('Try again'),
+                    ),
+                  ] else if (_users == null)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else ...[
+                    if (_users!.length > 6) ...[
+                      TextField(
+                        controller: _search,
+                        textInputAction: TextInputAction.search,
+                        decoration: const InputDecoration(
+                          labelText: 'Find your name',
+                          prefixIcon: Icon(Icons.search_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (users.isEmpty)
+                      const LgEmptyState(
+                        icon: Icons.person_search_rounded,
+                        title: 'No one matches that name',
+                        message: 'Check the spelling, or clear the search.',
+                      )
+                    else
+                      for (final u in users) ...[
+                        _PersonTile(user: u),
+                        const SizedBox(height: 8),
+                      ],
                   ],
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -152,7 +215,9 @@ class _PersonTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => _PinScreen(user: user))),
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => _PinScreen(user: user))),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 72),
           child: Padding(
@@ -165,8 +230,20 @@ class _PersonTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                      Text(user.roleLabel, style: const TextStyle(color: LgColors.muted, fontSize: 13)),
+                      Text(
+                        user.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        user.roleLabel,
+                        style: const TextStyle(
+                          color: LgColors.muted,
+                          fontSize: 13,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -200,11 +277,16 @@ class _PinScreenState extends State<_PinScreen> {
       _busy = true;
       _error = null;
     });
-    final device = Theme.of(context).platform == TargetPlatform.iOS ? 'iOS app' : 'Android app';
+    final device = kIsWeb
+        ? 'Web app'
+        : Theme.of(context).platform == TargetPlatform.iOS
+        ? 'iOS app'
+        : 'Android app';
     try {
       await context.read<Session>().signIn(widget.user.id, _pin, device);
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.message;
         _pin = '';
@@ -229,7 +311,20 @@ class _PinScreenState extends State<_PinScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
+    const keys = [
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      'back',
+      '0',
+      'ok',
+    ];
     return Scaffold(
       appBar: AppBar(title: Text(firstName(widget.user.name))),
       body: SafeArea(
@@ -238,24 +333,35 @@ class _PinScreenState extends State<_PinScreen> {
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 16),
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 16,
+                ),
                 child: Column(
                   children: [
                     LgAvatar(name: widget.user.name, radius: 28),
                     const SizedBox(height: 12),
-                    const Text('Enter your PIN', style: TextStyle(color: LgColors.muted)),
+                    const Text(
+                      'Enter your PIN',
+                      style: TextStyle(color: LgColors.muted),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        for (var i = 0; i < (_pin.length > 4 ? _pin.length : 4); i++)
+                        for (
+                          var i = 0;
+                          i < (_pin.length > 4 ? _pin.length : 4);
+                          i++
+                        )
                           Container(
                             margin: const EdgeInsets.symmetric(horizontal: 6),
                             width: 16,
                             height: 16,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: i < _pin.length ? LgColors.accent : LgColors.line,
+                              color: i < _pin.length
+                                  ? LgColors.accent
+                                  : LgColors.line,
                             ),
                           ),
                       ],
@@ -264,12 +370,21 @@ class _PinScreenState extends State<_PinScreen> {
                       height: 48,
                       child: Center(
                         child: _busy
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : Semantics(
                                 liveRegion: true,
                                 child: Text(
                                   _error ?? '',
-                                  style: const TextStyle(color: LgColors.danger, fontWeight: FontWeight.w600),
+                                  style: const TextStyle(
+                                    color: LgColors.danger,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                       ),
@@ -314,7 +429,10 @@ class _PinScreenState extends State<_PinScreen> {
     }
     return OutlinedButton(
       onPressed: _busy ? null : () => _tap(k),
-      child: Text(k, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+      child: Text(
+        k,
+        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }

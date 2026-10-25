@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -89,12 +90,23 @@ class _TripScreenState extends State<TripScreen> {
   void _snack(String msg) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 
-  Future<void> _act(String op, {int? stopId, int? routeId, int? studentId}) async {
+  Future<void> _act(
+    String op, {
+    int? stopId,
+    int? routeId,
+    int? studentId,
+  }) async {
     if (op == 'start' && !await _requestLocationConsent()) return;
     if (!mounted) return;
     setState(() => stopId == null ? _busy = true : _busyStop = stopId);
     try {
-      final t = await _api.action(_trip.id, op, stopId: stopId, routeId: routeId, studentId: studentId);
+      final t = await _api.action(
+        _trip.id,
+        op,
+        stopId: stopId,
+        routeId: routeId,
+        studentId: studentId,
+      );
       if (!mounted) return;
       setState(() => _trip = t);
       if (op == 'start') await _startTracking();
@@ -116,10 +128,18 @@ class _TripScreenState extends State<TripScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Send SOS?'),
-        content: const Text('The school desk gets this alert, with the cab’s live location when the phone has a fix.'),
+        content: const Text(
+          'The school desk gets this alert, with the cab’s live location when the phone has a fix.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Send SOS')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Send SOS'),
+          ),
         ],
       ),
     );
@@ -144,10 +164,18 @@ class _TripScreenState extends State<TripScreen> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Save this pickup?'),
-        content: Text('${s.firstName} has no location yet. Save where the cab is now, and the route times update.'),
+        content: Text(
+          '${s.firstName} has no location yet. Save where the cab is now, and the route times update.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Not now')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Save location')),
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Save location'),
+          ),
         ],
       ),
     );
@@ -160,13 +188,24 @@ class _TripScreenState extends State<TripScreen> {
     setState(() => _busyStop = s.id);
     try {
       final last = _tracker.lastFix;
-      final fresh = last != null && DateTime.now().difference(last.timestamp).inSeconds < 90;
+      final fresh =
+          last != null &&
+          DateTime.now().difference(last.timestamp).inSeconds < 90;
       final pos = fresh
           ? last
           : await Geolocator.getCurrentPosition(
-              locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)),
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 20),
+              ),
             );
-      final t = await _api.action(_trip.id, 'set_location', stopId: s.id, lat: pos.latitude, lng: pos.longitude);
+      final t = await _api.action(
+        _trip.id,
+        'set_location',
+        stopId: s.id,
+        lat: pos.latitude,
+        lng: pos.longitude,
+      );
       if (!mounted) return;
       setState(() => _trip = t);
       _snack('Location saved. Route times updated.');
@@ -175,7 +214,9 @@ class _TripScreenState extends State<TripScreen> {
     } on TimeoutException {
       if (mounted) _snack('No GPS fix yet. Step outside and try again.');
     } on LocationServiceDisabledException {
-      if (mounted) _snack('Turn on Location in the phone settings, then try again.');
+      if (mounted) {
+        _snack('Turn on Location in the phone settings, then try again.');
+      }
     } on PermissionDeniedException {
       if (mounted) _snack('Location permission is needed to save this stop.');
     } finally {
@@ -218,7 +259,10 @@ class _TripScreenState extends State<TripScreen> {
 
   Future<void> _finish() async {
     final n = _trip.pendingCount;
-    if (n == 0 || await _confirm('$n ${n == 1 ? 'child is' : 'children are'} not marked yet. Finish anyway?')) {
+    if (n == 0 ||
+        await _confirm(
+          '$n ${n == 1 ? 'child is' : 'children are'} not marked yet. Finish anyway?',
+        )) {
       await _act('finish');
     }
   }
@@ -232,7 +276,9 @@ class _TripScreenState extends State<TripScreen> {
   Future<void> _changeRoute() async {
     List<RouteOption> routes;
     try {
-      routes = (await _api.routes()).where((r) => r.runs(_trip.direction) && r.id != _trip.routeId).toList();
+      routes = (await _api.routes())
+          .where((r) => r.runs(_trip.direction) && r.id != _trip.routeId)
+          .toList();
     } on ApiException catch (e) {
       if (mounted) _snack(e.message);
       return;
@@ -251,7 +297,10 @@ class _TripScreenState extends State<TripScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text('Change route', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              child: Text(
+                'Change route',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -263,7 +312,9 @@ class _TripScreenState extends State<TripScreen> {
             for (final r in routes)
               ListTile(
                 title: Text(r.name),
-                subtitle: Text('${r.children} ${r.children == 1 ? 'child' : 'children'}'),
+                subtitle: Text(
+                  '${r.children} ${r.children == 1 ? 'child' : 'children'}',
+                ),
                 onTap: () => Navigator.pop(c, r),
               ),
           ],
@@ -271,7 +322,9 @@ class _TripScreenState extends State<TripScreen> {
       ),
     );
     if (picked == null || !mounted) return;
-    if (!await _confirm('Use ${picked.name} for the rest of this trip?')) return;
+    if (!await _confirm('Use ${picked.name} for the rest of this trip?')) {
+      return;
+    }
     await _act('set_route', routeId: picked.id);
   }
 
@@ -295,15 +348,27 @@ class _TripScreenState extends State<TripScreen> {
       trip: _trip,
       next: s.id == nextId,
       busy: _busyStop == s.id,
-      canUp: _editable && s.pending && prev != null && (_trip.scheduled || prev.pending),
-      canDown: _editable && s.pending && nextStop != null && (_trip.scheduled || nextStop.pending),
-      onAction: (op) => op == 'reached' && !s.hasLocation ? _markReached(s) : _act(op, stopId: s.id),
+      canUp:
+          _editable &&
+          s.pending &&
+          prev != null &&
+          (_trip.scheduled || prev.pending),
+      canDown:
+          _editable &&
+          s.pending &&
+          nextStop != null &&
+          (_trip.scheduled || nextStop.pending),
+      onAction: (op) => op == 'reached' && !s.hasLocation
+          ? _markReached(s)
+          : _act(op, stopId: s.id),
       onWhatsApp: (kind, p) => _whatsApp(s, kind, p),
       onSetLocation: () => _saveLocation(s),
       onRemove: !_editable || !s.pending
           ? null
           : () async {
-              if (await _confirm('Take ${s.firstName} off this trip?')) await _act('remove', stopId: s.id);
+              if (await _confirm('Take ${s.firstName} off this trip?')) {
+                await _act('remove', stopId: s.id);
+              }
             },
     );
   }
@@ -311,12 +376,21 @@ class _TripScreenState extends State<TripScreen> {
   @override
   Widget build(BuildContext context) {
     final tracker = context.watch<LocationTracker>();
-    final dueCount = _trip.stops.where((s) => s.etaAlertDue && s.parents.isNotEmpty).length;
-    final nextId = _trip.stops.where((s) => s.pending).map((s) => s.id).firstOrNull;
+    final dueCount = _trip.stops
+        .where((s) => s.etaAlertDue && s.parents.isNotEmpty)
+        .length;
+    final nextId = _trip.stops
+        .where((s) => s.pending)
+        .map((s) => s.id)
+        .firstOrNull;
     final done = _trip.stops.where((s) => !s.pending).length;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_trip.runNo > 1 ? '${_trip.routeName} · Run ${_trip.runNo}' : _trip.routeName),
+        title: Text(
+          _trip.runNo > 1
+              ? '${_trip.routeName} · Run ${_trip.runNo}'
+              : _trip.routeName,
+        ),
         actions: [
           if (_editable)
             PopupMenuButton<String>(
@@ -354,14 +428,20 @@ class _TripScreenState extends State<TripScreen> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: _busy ? null : _sos,
-                  style: OutlinedButton.styleFrom(foregroundColor: LgColors.danger),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: LgColors.danger,
+                  ),
                   icon: const Icon(Icons.sos_rounded),
                   label: const Text('SOS — alert the school'),
                 ),
               ),
             ],
             const SizedBox(height: 12),
-            _TrackingBanner(trip: _trip, tracker: tracker, onRetry: _startTracking),
+            _TrackingBanner(
+              trip: _trip,
+              tracker: tracker,
+              onRetry: _startTracking,
+            ),
             if (_editable) ...[
               const SizedBox(height: 8),
               const Text(
@@ -416,12 +496,21 @@ class _RideStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final aboard = trip.direction == 'drop' ? trip.pendingCount : trip.stops.where((s) => s.status == 'done').length;
+    final aboard = trip.direction == 'drop'
+        ? trip.pendingCount
+        : trip.stops.where((s) => s.status == 'done').length;
     final done = trip.stops.where((s) => !s.pending).length;
-    final next = trip.stops.where((s) => s.pending && s.etaMinutes != null).map((s) => s.etaMinutes!).firstOrNull;
+    final next = trip.stops
+        .where((s) => s.pending && s.etaMinutes != null)
+        .map((s) => s.etaMinutes!)
+        .firstOrNull;
     final started = trip.startedAt;
-    final minutes = started == null ? null : DateTime.now().difference(started).inMinutes;
-    final gps = trip.lastLocationAt != null && DateTime.now().difference(trip.lastLocationAt!).inSeconds < 180;
+    final minutes = started == null
+        ? null
+        : DateTime.now().difference(started).inMinutes;
+    final gps =
+        trip.lastLocationAt != null &&
+        DateTime.now().difference(trip.lastLocationAt!).inSeconds < 180;
     final cells = [
       ('$aboard', 'Aboard'),
       ('$done/${trip.stops.length}', 'Stops'),
@@ -442,11 +531,23 @@ class _RideStats extends StatelessWidget {
                   border: Border.all(color: LgColors.line),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                   child: Column(
                     children: [
-                      Text(c.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      Text(c.$2, style: const TextStyle(color: LgColors.muted, fontSize: 11)),
+                      Text(
+                        c.$1,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        c.$2,
+                        style: const TextStyle(
+                          color: LgColors.muted,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -591,12 +692,27 @@ class _TrackingBanner extends StatelessWidget {
     }
     return Column(
       children: [
-        LgNotice(message: text, foreground: color, background: background, icon: icon),
+        LgNotice(
+          message: text,
+          foreground: color,
+          background: background,
+          icon: icon,
+        ),
         if (!mine) ...[
           const SizedBox(height: 8),
           FilledButton(onPressed: onRetry, child: const Text('Share location')),
         ],
-        if (mine && !tracker.alwaysAllowed) ...[
+        if (mine && kIsWeb) ...[
+          const SizedBox(height: 8),
+          const LgNotice(
+            message:
+                'Keep this tab open to share location. Use the mobile app for tracking with the screen off.',
+            foreground: LgColors.info,
+            background: LgColors.infoBg,
+            icon: Icons.info_outline,
+          ),
+        ],
+        if (mine && !kIsWeb && !tracker.alwaysAllowed) ...[
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: tracker.openLocationSettings,
@@ -663,7 +779,14 @@ class _StopCard extends StatelessWidget {
                       if (next)
                         const Padding(
                           padding: EdgeInsets.only(bottom: 4),
-                          child: Text('Next stop', style: TextStyle(color: LgColors.warn, fontWeight: FontWeight.w700, fontSize: 12)),
+                          child: Text(
+                            'Next stop',
+                            style: TextStyle(
+                              color: LgColors.warn,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       Text(
                         '${s.order}. ${s.name}',
@@ -674,8 +797,14 @@ class _StopCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        [s.grade, if (s.note.isNotEmpty) s.note].where((part) => part.isNotEmpty).join(' · '),
-                        style: const TextStyle(color: LgColors.muted, fontSize: 13),
+                        [
+                          s.grade,
+                          if (s.note.isNotEmpty) s.note,
+                        ].where((part) => part.isNotEmpty).join(' · '),
+                        style: const TextStyle(
+                          color: LgColors.muted,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -698,7 +827,10 @@ class _StopCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   if (onRemove != null)
-                    TextButton(onPressed: busy ? null : onRemove, child: const Text('Remove')),
+                    TextButton(
+                      onPressed: busy ? null : onRemove,
+                      child: const Text('Remove'),
+                    ),
                 ],
               ),
             ],
@@ -709,7 +841,11 @@ class _StopCard extends StatelessWidget {
                   padding: EdgeInsets.only(bottom: 8),
                   child: Text(
                     'No location saved. Reach the stop, then save where you are so the route times update.',
-                    style: TextStyle(color: LgColors.muted, fontSize: 13, height: 1.3),
+                    style: TextStyle(
+                      color: LgColors.muted,
+                      fontSize: 13,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               if (!s.hasLocation && s.reached) ...[
@@ -738,8 +874,14 @@ class _StopCard extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: due || (s.reached && !s.reachedAlertSent)
-                      ? FilledButton(onPressed: busy ? null : () => _openMore(context), child: const Text('More'))
-                      : TextButton(onPressed: busy ? null : () => _openMore(context), child: const Text('More')),
+                      ? FilledButton(
+                          onPressed: busy ? null : () => _openMore(context),
+                          child: const Text('More'),
+                        )
+                      : TextButton(
+                          onPressed: busy ? null : () => _openMore(context),
+                          child: const Text('More'),
+                        ),
                 ),
               if (s.etaAlertSent || s.reachedAlertSent)
                 Text(
@@ -786,17 +928,27 @@ class _StopCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Message family', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              const Text(
+                'Message family',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
               const SizedBox(height: 12),
               if (s.parents.isEmpty)
-                const Text('No parent phone on file.', style: TextStyle(color: LgColors.muted))
+                const Text(
+                  'No parent phone on file.',
+                  style: TextStyle(color: LgColors.muted),
+                )
               else
                 for (final p in s.parents) ...[
                   if (!s.reached) ...[
-                    _waButton('${_parentLabel(p)}: 5 min away', highlight: s.etaAlertDue, onTap: () {
-                      Navigator.pop(c);
-                      onWhatsApp('eta', p);
-                    }),
+                    _waButton(
+                      '${_parentLabel(p)}: 5 min away',
+                      highlight: s.etaAlertDue,
+                      onTap: () {
+                        Navigator.pop(c);
+                        onWhatsApp('eta', p);
+                      },
+                    ),
                     const SizedBox(height: 8),
                   ],
                   _waButton(
@@ -830,7 +982,10 @@ class _StopCard extends StatelessWidget {
     final icon = const Icon(Icons.chat_rounded, size: 20);
     final button = highlight
         ? FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF128C7E), foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF128C7E),
+              foregroundColor: Colors.white,
+            ),
             onPressed: onTap,
             icon: icon,
             label: Text(label),
@@ -895,7 +1050,10 @@ class _ChildPickerState extends State<_ChildPicker> {
     super.initState();
     _search.addListener(() {
       _debounce?.cancel();
-      _debounce = Timer(const Duration(milliseconds: 300), () => _load(_search.text));
+      _debounce = Timer(
+        const Duration(milliseconds: 300),
+        () => _load(_search.text),
+      );
     });
     _load('');
   }
@@ -938,7 +1096,10 @@ class _ChildPickerState extends State<_ChildPicker> {
             padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Add a child', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              child: Text(
+                'Add a child',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
             ),
           ),
           Padding(
@@ -955,7 +1116,10 @@ class _ChildPickerState extends State<_ChildPicker> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(_error!, style: const TextStyle(color: LgColors.danger)),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: LgColors.danger),
+              ),
             ),
           Expanded(
             child: _loading

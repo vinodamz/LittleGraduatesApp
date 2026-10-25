@@ -44,8 +44,11 @@ class LocationTracker extends ChangeNotifier {
       return 'Turn on Location in the phone settings, then try again.';
     }
     var p = await Geolocator.checkPermission();
-    if (p == LocationPermission.denied) p = await Geolocator.requestPermission();
-    if (p == LocationPermission.denied || p == LocationPermission.deniedForever) {
+    if (p == LocationPermission.denied) {
+      p = await Geolocator.requestPermission();
+    }
+    if (p == LocationPermission.denied ||
+        p == LocationPermission.deniedForever) {
       return 'Location permission is needed to share the cab with families. Allow it in Settings → Apps → Little Graduates.';
     }
     await Notifications.requestPermission();
@@ -74,14 +77,20 @@ class LocationTracker extends ChangeNotifier {
     problem = null;
     _notified.clear();
 
-    final settings = defaultTargetPlatform == TargetPlatform.android
+    final settings = kIsWeb
+        ? const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10,
+          )
+        : defaultTargetPlatform == TargetPlatform.android
         ? AndroidSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: 10,
             intervalDuration: const Duration(seconds: 5),
             foregroundNotificationConfig: ForegroundNotificationConfig(
               notificationTitle: 'Trip running · $name',
-              notificationText: 'Sharing the cab location with families until the trip ends',
+              notificationText:
+                  'Sharing the cab location with families until the trip ends',
               enableWakeLock: true,
               setOngoing: true,
             ),
@@ -94,26 +103,32 @@ class LocationTracker extends ChangeNotifier {
             pauseLocationUpdatesAutomatically: false,
           );
 
-    _positions = Geolocator.getPositionStream(locationSettings: settings).listen(
-      (pos) {
-        lastFix = pos;
-        _buffer.add({
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'accuracy': pos.accuracy,
-          'speed': pos.speed,
-          'heading': pos.heading,
-          't': pos.timestamp.millisecondsSinceEpoch,
-        });
-        if (_buffer.length > 500) _buffer.removeRange(0, _buffer.length - 500);
-        notifyListeners();
-      },
-      onError: (Object e) {
-        problem = 'Location stopped: $e';
-        notifyListeners();
-      },
+    _positions = Geolocator.getPositionStream(locationSettings: settings)
+        .listen(
+          (pos) {
+            lastFix = pos;
+            _buffer.add({
+              'lat': pos.latitude,
+              'lng': pos.longitude,
+              'accuracy': pos.accuracy,
+              'speed': pos.speed,
+              'heading': pos.heading,
+              't': pos.timestamp.millisecondsSinceEpoch,
+            });
+            if (_buffer.length > 500) {
+              _buffer.removeRange(0, _buffer.length - 500);
+            }
+            notifyListeners();
+          },
+          onError: (Object e) {
+            problem = 'Location stopped: $e';
+            notifyListeners();
+          },
+        );
+    _uploader = Timer.periodic(
+      AppConfig.locationUploadInterval,
+      (_) => upload(),
     );
-    _uploader = Timer.periodic(AppConfig.locationUploadInterval, (_) => upload());
     notifyListeners();
     return null;
   }
@@ -136,7 +151,10 @@ class LocationTracker extends ChangeNotifier {
     _uploading = true;
     final batch = List<Map<String, dynamic>>.of(_buffer);
     try {
-      final d = await api.post('transport/location.php', {'trip_id': id, 'points': batch});
+      final d = await api.post('transport/location.php', {
+        'trip_id': id,
+        'points': batch,
+      });
       _buffer.removeRange(0, batch.length.clamp(0, _buffer.length));
       lastUploadAt = DateTime.now();
       problem = null;
@@ -160,10 +178,15 @@ class LocationTracker extends ChangeNotifier {
     }
   }
 
-  Future<void> _notifyFor({required List<int> reached, required List<int> due}) async {
+  Future<void> _notifyFor({
+    required List<int> reached,
+    required List<int> due,
+  }) async {
     final fresh = [
-      for (final s in reached) if (!_notified.contains('r$s')) ('r', s),
-      for (final s in due) if (!_notified.contains('e$s')) ('e', s),
+      for (final s in reached)
+        if (!_notified.contains('r$s')) ('r', s),
+      for (final s in due)
+        if (!_notified.contains('e$s')) ('e', s),
     ];
     if (fresh.isEmpty || tripId == null) return;
     final trip = await transport.trip(tripId!);
@@ -173,11 +196,19 @@ class LocationTracker extends ChangeNotifier {
       final s = byId[id];
       if (s == null || s.parents.isEmpty) continue;
       if (kind == 'r') {
-        await Notifications.show(id * 2, 'Reached ${s.firstName}\'s stop',
-            'Tap to tell the family on WhatsApp', payload: '$id');
+        await Notifications.show(
+          id * 2,
+          'Reached ${s.firstName}\'s stop',
+          'Tap to tell the family on WhatsApp',
+          payload: '$id',
+        );
       } else {
-        await Notifications.show(id * 2 + 1, '${s.firstName} is about 5 minutes away',
-            'Tap to send the 5-minute WhatsApp', payload: '$id');
+        await Notifications.show(
+          id * 2 + 1,
+          '${s.firstName} is about 5 minutes away',
+          'Tap to send the 5-minute WhatsApp',
+          payload: '$id',
+        );
       }
     }
   }
