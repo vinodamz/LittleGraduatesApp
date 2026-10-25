@@ -25,6 +25,12 @@ const assert = require('node:assert/strict');
   await context.route(mtt+'/app/open.php', async route => {
    const req=route.request();
    assert.equal(req.method(),'POST');
+   assert.equal(req.headers().origin, origin, 'Workspace POST lost the app origin');
+   if (process.env.LG_VERIFY_REAL_BRIDGE === '1') {
+     const response = await route.fetch();
+     assert.equal(response.status(), 401, 'Real MTT must reject the fixture token, not the app origin');
+     assert(!(await response.text()).includes('origin_denied'));
+   }
    assert(!req.url().includes('token='));
    const data=new URLSearchParams(req.postData());
    assert.equal(data.get('token'),'a'.repeat(64));

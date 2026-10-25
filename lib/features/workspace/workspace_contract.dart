@@ -23,7 +23,7 @@ bool isSchoolUrl(String value) {
 String workspaceBootstrap(String token, String path) {
   const escape = HtmlEscape(HtmlEscapeMode.attribute);
   final endpoint = escape.convert('${AppConfig.baseUrl}/app/open.php');
-  return '''<!doctype html><html lang="en"><head><meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+  return '''<!doctype html><html lang="en"><head><meta name="referrer" content="strict-origin"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
 <form method="post" action="$endpoint"><input type="hidden" name="token" value="${escape.convert(token)}"><input type="hidden" name="path" value="${escape.convert(path)}"></form>
 <script>document.forms[0].submit();</script></body></html>''';
 }
