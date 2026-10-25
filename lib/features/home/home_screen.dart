@@ -192,7 +192,7 @@ class _TodayScreenState extends State<TodayScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: LgColors.ink,
+                color: LgColors.indigo,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Column(

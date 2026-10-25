@@ -12,6 +12,6 @@ Regenerate from the repository root:
 flutter test --no-pub test/operations_design_test.dart --dart-define=LG_DESIGN_PREVIEWS=true
 ```
 
-Validation: Flutter 3.47.8, Dart 3.13.7. All 39 tests pass; `flutter analyze --no-pub` reports no issues. Layout tests cover 375px phone width, landscape, tablet, and desktop at 2× text size with reduced motion. Existing privacy, transport API, and offline materials queue tests remain green. The lockfile includes four test/SDK dependency changes required by this Flutter version.
+Validation: Flutter 3.47.8, Dart 3.13.7. All 42 tests pass; `flutter analyze --no-pub` reports no issues. Layout tests cover 375px phone width, landscape, tablet, and desktop at 2× text size with reduced motion. Existing privacy, transport API, and offline materials queue tests remain green. The lockfile includes four test/SDK dependency changes required by this Flutter version.
 
-This change updates the native app. Tools that open external MTT website pages retain their existing website UI. Light mode is the app's only exposed theme. Device-level GPS/background upload behavior and authenticated production data have not been exercised in these widget tests.
+These previews use the official website logo, cream/indigo/pink palette, Nunito body text and Baloo 2 headings. Other school tools now open in an authenticated app workspace with matching branding. Light mode is the app's only exposed theme. Device-level GPS/background upload behavior and authenticated production data have not been exercised in these widget tests.
