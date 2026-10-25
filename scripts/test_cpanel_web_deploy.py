@@ -24,6 +24,16 @@ class WebDeploymentTests(unittest.TestCase):
             self.assertEqual(api.call_args_list[3].args, ('VersionControlDeployment', 'create'))
             self.assertTrue(request.call_args.args[0].startswith('https://app.thelittlegraduates.in/'))
 
+    def test_new_repository_uses_structured_clone_source(self):
+        import json
+        responses = [{'data': {'documentroot': '/home/school/thelittlegraduates.in/app'}},
+                     {'data': []}, {'status': 1}, {'status': 1}, {'status': 1}, {'status': 1}]
+        with patch.dict(os.environ, {'CPANEL_USER': 'school', 'SOURCE_SHA': 'release'}), patch.object(deployment, 'api', side_effect=responses) as api, patch.object(deployment.urllib.request, 'urlopen', return_value=io.BytesIO(b'release')):
+            deployment.deploy()
+            clone = api.call_args_list[2]
+            self.assertEqual(clone.args, ('VersionControl', 'create'))
+            self.assertEqual(json.loads(clone.kwargs['source_repository']), {'remote_name': 'origin', 'url': 'https://github.com/vinodamz/LittleGraduatesApp.git'})
+
 
 if __name__ == '__main__':
     unittest.main()
