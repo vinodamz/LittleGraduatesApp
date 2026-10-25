@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
+import '../../core/module_registry.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import 'materials_api.dart';
@@ -103,6 +104,42 @@ class MaterialsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Materials'),
         actions: [
+          if (day != null)
+            PopupMenuButton<String>(
+              tooltip: 'Materials tools',
+              onSelected: (value) {
+                final entries = {
+                  'Audit history': day.links.history,
+                  'Trends': day.links.trends,
+                  'Monthly board': day.links.monthly,
+                  'My duties': day.links.duties,
+                  'Assign someone': day.links.assign,
+                };
+                openWebUrl(context, entries[value]!, value);
+              },
+              itemBuilder: (_) => [
+                if (day.canMonthly) ...[
+                  const PopupMenuItem(
+                    value: 'Audit history',
+                    child: Text('Audit history'),
+                  ),
+                  const PopupMenuItem(value: 'Trends', child: Text('Trends')),
+                  const PopupMenuItem(
+                    value: 'Monthly board',
+                    child: Text('Monthly board'),
+                  ),
+                ],
+                const PopupMenuItem(
+                  value: 'My duties',
+                  child: Text('My duties'),
+                ),
+                if (day.isAdmin)
+                  const PopupMenuItem(
+                    value: 'Assign someone',
+                    child: Text('Assign someone'),
+                  ),
+              ],
+            ),
           IconButton(
             tooltip: 'Refresh and retry saved checks',
             onPressed: controller.busy ? null : controller.kick,

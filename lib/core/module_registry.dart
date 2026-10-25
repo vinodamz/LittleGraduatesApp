@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../features/workspace/workspace_screen.dart';
+import '../features/workspace/workspace_contract.dart';
 
 import '../features/materials/materials_screen.dart';
 import '../features/staff/staff_screen.dart';
@@ -8,7 +9,7 @@ import 'nav.dart';
 import 'session.dart';
 
 /// Native screens by module key. To bring another MTT module into the app,
-/// add its screen here and mark it `native` in the server's api_app_modules().
+/// add its screen here. Other school tools use the shared workspace.
 final Map<String, WidgetBuilder> nativeModuleScreens = {
   'transport': (_) => const TransportHubScreen(),
   'staff': (_) => const StaffScreen(),
@@ -32,10 +33,9 @@ const Map<String, IconData> moduleIcons = {
   'recruitment': Icons.work_rounded,
 };
 
-/// Transport, Staff and Materials have screens in this build even if an
-/// older server still marks them as website links.
+/// All trusted school tools stay inside the app, including legacy modules.
 bool moduleOpensInApp(AppModule m) =>
-    m.native || m.key == 'transport' || m.key == 'staff' || m.key == 'materials';
+    nativeModuleScreens.containsKey(m.key) || isSchoolUrl(m.webUrl);
 
 Future<void> openModule(BuildContext context, AppModule m) async {
   if (m.key == 'transport' || m.key == 'staff' || m.key == 'materials') {
@@ -50,15 +50,19 @@ Future<void> openModule(BuildContext context, AppModule m) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: builder));
     return;
   }
-  final ok = await launchUrl(Uri.parse(m.webUrl), mode: LaunchMode.externalApplication);
-  if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${m.label}.')));
-  }
+  await openWebUrl(context, m.webUrl, m.label);
 }
 
 Future<void> openWebUrl(BuildContext context, String url, String label) async {
-  final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-  if (!ok && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open $label.')));
+  if (!isSchoolUrl(url)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This is not a supported school link.')),
+    );
+    return;
   }
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => WorkspaceScreen(url: url, label: label),
+    ),
+  );
 }

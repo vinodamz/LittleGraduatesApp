@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/session.dart';
+import '../../core/config.dart';
+import '../../core/module_registry.dart';
 import '../../core/theme.dart';
 import 'live_screen.dart';
 import 'messages_screen.dart';
@@ -45,6 +47,17 @@ class TransportHubScreen extends StatelessWidget {
               Expanded(child: Text(admin ? 'Transport desk' : 'Transport')),
             ],
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Transport tools',
+              icon: const Icon(Icons.tune_rounded),
+              onPressed: () => openWebUrl(
+                context,
+                '${AppConfig.baseUrl}/transport/index.php',
+                'Transport tools',
+              ),
+            ),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
