@@ -129,9 +129,11 @@ Future<void> _capture(WidgetTester tester, String name) async {
 
 void main() {
   setUpAll(() async {
-    final font = FontLoader('Inter')
-      ..addFont(rootBundle.load('assets/fonts/Inter.ttf'));
-    await font.load();
+    for (final family in ['Nunito', 'Baloo2']) {
+      final font = FontLoader(family)
+        ..addFont(rootBundle.load('assets/fonts/$family.ttf'));
+      await font.load();
+    }
     final icons = FontLoader('MaterialIcons')
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
     await icons.load();

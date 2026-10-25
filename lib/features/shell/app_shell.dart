@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/nav.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
+import '../../core/school_logo.dart';
 import '../home/home_screen.dart';
 import '../materials/materials_controller.dart';
 import '../materials/materials_screen.dart';
@@ -120,11 +121,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                         onDestinationSelected: (i) => _go(tabs, tabs[i].key),
                         leading: const Padding(
                           padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Icon(
-                            Icons.school_outlined,
-                            color: LgColors.accent,
-                            size: 32,
-                          ),
+                          child: SchoolLogo(size: 56),
                         ),
                         destinations: [
                           for (final t in tabs)

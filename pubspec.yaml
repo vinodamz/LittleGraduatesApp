@@ -74,10 +74,15 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/brand/logo.png
   fonts:
-    - family: Inter
+    - family: Nunito
       fonts:
-        - asset: assets/fonts/Inter.ttf
+        - asset: assets/fonts/Nunito.ttf
+    - family: Baloo2
+      fonts:
+        - asset: assets/fonts/Baloo2.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

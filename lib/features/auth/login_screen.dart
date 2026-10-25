@@ -8,6 +8,7 @@ import '../../core/format.dart';
 import '../../core/privacy.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
+import '../../core/school_logo.dart';
 import '../../core/widgets.dart';
 
 class _LoginUser {
@@ -88,23 +89,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: LgColors.ink,
+                      color: LgColors.accentSoft,
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.school_outlined,
-                          color: Colors.white,
-                          size: 36,
-                        ),
+                        const SchoolLogo(size: 92),
                         const SizedBox(height: 24),
                         Text(
                           _school,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
+                            color: LgColors.indigo,
+                            fontFamily: 'Baloo2',
+                            fontSize: 28,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
@@ -112,10 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 8),
                         const Text(
                           'School operations workspace',
-                          style: TextStyle(
-                            color: Color(0xFFE2DBE8),
-                            height: 1.5,
-                          ),
+                          style: TextStyle(color: LgColors.muted, height: 1.5),
                         ),
                       ],
                     ),
