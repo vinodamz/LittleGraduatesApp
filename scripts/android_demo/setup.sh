@@ -14,6 +14,16 @@ printf '%s\n' 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kv
 sudo udevadm control --reload-rules
 sudo udevadm trigger --name-match=kvm
 test -r /dev/kvm && test -w /dev/kvm
+# The image provides the SDK, but emulator-runner has not added its tools to
+# PATH yet. Resolve the inventory tools from that SDK before starting it.
+demo_android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+: "${demo_android_sdk:?The hosted runner must provide an Android SDK}"
+[[ -d "$demo_android_sdk" ]] || { echo "Android SDK directory is absent: $demo_android_sdk" >&2; exit 1; }
+test -x "$demo_android_sdk/platform-tools/adb"
+test -x "$demo_android_sdk/cmdline-tools/latest/bin/sdkmanager"
+export PATH="$demo_android_sdk/platform-tools:$demo_android_sdk/cmdline-tools/latest/bin:$PATH"
+printf '%s\n' "$demo_android_sdk/platform-tools" "$demo_android_sdk/cmdline-tools/latest/bin" >> "${GITHUB_PATH:?}"
+command -v adb sdkmanager
 {
   git rev-parse HEAD
   git -C .demo-mtt rev-parse HEAD
