@@ -3,9 +3,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../core/config.dart';
 import 'workspace_contract.dart';
+import 'workspace_file_selector.dart';
 
 class WorkspaceView extends StatefulWidget {
   const WorkspaceView({
@@ -27,6 +29,8 @@ class WorkspaceView extends StatefulWidget {
 class _WorkspaceViewState extends State<WorkspaceView> {
   late final WebViewController _controller;
   late final void Function() _back;
+  final _fileSelector = WorkspaceFileSelector();
+  int _pageGeneration = 0;
 
   @override
   void initState() {
@@ -77,6 +81,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
             return NavigationDecision.prevent;
           },
           onPageStarted: (_) {
+            _pageGeneration++;
             if (mounted) widget.onEvent({'event': 'loading'});
           },
           onWebResourceError: (error) {
@@ -92,18 +97,57 @@ class _WorkspaceViewState extends State<WorkspaceView> {
       );
     _back = () => _controller.runJavaScript('history.back()');
     widget.actions.back = _back;
-    _controller.loadRequest(
-      Uri.parse('${AppConfig.baseUrl}/app/open.php'),
-      method: LoadRequestMethod.post,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: Uint8List.fromList(
-        utf8.encode(
-          Uri(
-            queryParameters: {'token': widget.token, 'path': widget.path},
-          ).query,
+    _openWorkspace();
+  }
+
+  Future<void> _openWorkspace() async {
+    try {
+      final platform = _controller.platform;
+      if (platform is AndroidWebViewController) {
+        // Register before loading so even the first form can select files.
+        // Keep the plugin's default denial of camera/microphone permissions.
+        await platform.setOnShowFileSelector(_selectFiles);
+      }
+      if (!mounted) return;
+      await _controller.loadRequest(
+        Uri.parse('${AppConfig.baseUrl}/app/open.php'),
+        method: LoadRequestMethod.post,
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: Uint8List.fromList(
+          utf8.encode(
+            Uri(
+              queryParameters: {'token': widget.token, 'path': widget.path},
+            ).query,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (_) {
+      if (mounted) {
+        widget.onEvent({
+          'event': 'error',
+          'message': 'Could not open this school tool. Please try again.',
+        });
+      }
+    }
+  }
+
+  Future<List<String>> _selectFiles(FileSelectorParams params) async {
+    if (!mounted) return [];
+    final generation = _pageGeneration;
+    try {
+      final files = await _fileSelector.select(params);
+      // A selection must not reach a replacement document or account.
+      return mounted && generation == _pageGeneration ? files : [];
+    } catch (_) {
+      if (mounted && generation == _pageGeneration) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open that file. Please choose it again.'),
+          ),
+        );
+      }
+      return [];
+    }
   }
 
   @override
