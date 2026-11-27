@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      DEMO_OUTPUT: ${{ runner.temp }}/android-demo-evidence
+      DEMO_OUTPUT: /tmp/lg-android-demo-evidence
       DEMO_RUNTIME: /tmp/lg-android-demo
       DEMO_UPLOAD_DELAY_SECONDS: '30'
       BACKEND_REF: ${{ inputs.backend_ref || '19c07a772cf12e4d9c36ca4cd8712f31c83b494c' }}
