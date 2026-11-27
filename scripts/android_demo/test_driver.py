@@ -55,6 +55,17 @@ class DriverTests(unittest.TestCase):
                     "* ServiceRecord{def other/service}\nisForeground=true foregroundId=71041 foregroundServiceType=0x1")
         self.assertFalse(foreground_evidence(services, f"NotificationRecord(pkg={PACKAGE} id=71041)"))
 
+    def test_missing_foreground_service_retains_diagnostics_and_fails_gate(self):
+        demo = Demo.__new__(Demo)
+        with tempfile.TemporaryDirectory() as folder:
+            demo.output = Path(folder)
+            with patch.object(demo, "shell", side_effect=["No foreground services", "No active notifications"]), \
+                    patch.object(demo, "tree") as tree_read:
+                self.assertFalse(demo.upload_visible())
+            tree_read.assert_not_called()
+            self.assertEqual((demo.output / "latest-foreground-services.txt").read_text(), "No foreground services")
+            self.assertEqual((demo.output / "latest-notifications.txt").read_text(), "No active notifications")
+
     def test_wait_accepts_leaf_xml_node(self):
         demo = Demo.__new__(Demo)
         demo.record_started = None
