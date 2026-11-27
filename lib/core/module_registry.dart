@@ -31,6 +31,19 @@ const Map<String, IconData> moduleIcons = {
   'plans': Icons.event_note_rounded,
   'daycare': Icons.bedtime_rounded,
   'recruitment': Icons.work_rounded,
+  'wacrm': Icons.chat_rounded,
+  'n8n': Icons.account_tree_rounded,
+  'my_day': Icons.today_rounded,
+  'duties': Icons.fact_check_rounded,
+  'my_leave': Icons.event_available_rounded,
+  'notifications': Icons.notifications_rounded,
+  'money': Icons.account_balance_rounded,
+  'duties_admin': Icons.assignment_ind_rounded,
+  'feedback': Icons.feedback_rounded,
+  'surveys': Icons.poll_rounded,
+  'grades': Icons.school_rounded,
+  'mcp_admin': Icons.api_rounded,
+  'admin': Icons.admin_panel_settings_rounded,
 };
 
 /// All trusted school tools stay inside the app, including legacy modules.

@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
 import '../../core/config.dart';
-import '../../core/notifications.dart';
 import '../../core/privacy.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
@@ -16,9 +15,10 @@ import 'location_tracker.dart';
 import 'transport_api.dart';
 
 class TripScreen extends StatefulWidget {
-  const TripScreen({super.key, required this.initial});
+  const TripScreen({super.key, required this.initial, this.focusStopId});
 
   final Trip initial;
+  final int? focusStopId;
 
   @override
   State<TripScreen> createState() => _TripScreenState();
@@ -29,18 +29,21 @@ class _TripScreenState extends State<TripScreen> {
   late final TransportApi _api = TransportApi(context.read<ApiClient>());
   late final LocationTracker _tracker = context.read<LocationTracker>();
   Timer? _timer;
-  StreamSubscription<String>? _taps;
   String? _lastSignature;
   int? _busyStop;
   bool _busy = false;
   bool _locationConsent = false;
+  final _focusedStop = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(AppConfig.tripRefreshInterval, (_) => _reload());
-    _taps = Notifications.taps.listen((_) => _reload());
     _tracker.addListener(_onTracker);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _focusedStop.currentContext;
+      if (target != null) Scrollable.ensureVisible(target, alignment: 0.1);
+    });
     if (_trip.running && _tracker.tripId != _trip.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _startTracking());
     }
@@ -49,7 +52,6 @@ class _TripScreenState extends State<TripScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _taps?.cancel();
     _tracker.removeListener(_onTracker);
     super.dispose();
   }
@@ -110,7 +112,7 @@ class _TripScreenState extends State<TripScreen> {
       if (!mounted) return;
       setState(() => _trip = t);
       if (op == 'start') await _startTracking();
-      if (!t.running) await _tracker.stop();
+      if (!t.running && _tracker.tripId == t.id) await _tracker.stop();
     } on ApiException catch (e) {
       if (mounted) _snack(e.message);
     } finally {
@@ -470,6 +472,9 @@ class _TripScreenState extends State<TripScreen> {
             const SizedBox(height: 8),
             for (var i = 0; i < _trip.stops.length; i++)
               Padding(
+                key: _trip.stops[i].id == widget.focusStopId
+                    ? _focusedStop
+                    : null,
                 padding: const EdgeInsets.only(top: 10),
                 child: _stopCard(i, nextId),
               ),
@@ -705,8 +710,7 @@ class _TrackingBanner extends StatelessWidget {
         if (mine && kIsWeb) ...[
           const SizedBox(height: 8),
           const LgNotice(
-            message:
-                'Keep this tab open to share location. Use the mobile app for tracking with the screen off.',
+            message: 'Keep this tab open to share location. Use the mobile app for tracking with the screen off.',
             foreground: LgColors.info,
             background: LgColors.infoBg,
             icon: Icons.info_outline,
@@ -1044,12 +1048,18 @@ class _ChildPickerState extends State<_ChildPicker> {
   List<ChildOption> _children = [];
   bool _loading = true;
   String? _error;
+  int _searchVersion = 0;
 
   @override
   void initState() {
     super.initState();
     _search.addListener(() {
       _debounce?.cancel();
+      _searchVersion++;
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
       _debounce = Timer(
         const Duration(milliseconds: 300),
         () => _load(_search.text),
@@ -1066,9 +1076,15 @@ class _ChildPickerState extends State<_ChildPicker> {
   }
 
   Future<void> _load(String q) async {
+    final version = ++_searchVersion;
+    setState(() {
+      _children = [];
+      _loading = true;
+      _error = null;
+    });
     try {
       final children = await widget.api.children(q);
-      if (mounted) {
+      if (mounted && version == _searchVersion) {
         setState(() {
           _children = children;
           _loading = false;
@@ -1076,7 +1092,7 @@ class _ChildPickerState extends State<_ChildPicker> {
         });
       }
     } on ApiException catch (e) {
-      if (mounted) {
+      if (mounted && version == _searchVersion) {
         setState(() {
           _loading = false;
           _error = e.message;
@@ -1113,7 +1129,7 @@ class _ChildPickerState extends State<_ChildPicker> {
               ),
             ),
           ),
-          if (_error != null)
+          if (_error != null) ...[
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -1121,11 +1137,15 @@ class _ChildPickerState extends State<_ChildPicker> {
                 style: const TextStyle(color: LgColors.danger),
               ),
             ),
+            TextButton(onPressed: () => _load(_search.text), child: const Text('Retry')),
+          ],
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     children: [
+                      if (_error == null && _children.isEmpty)
+                        const ListTile(title: Text('No children match')),
                       for (final c in _children)
                         ListTile(
                           title: Text(c.name),

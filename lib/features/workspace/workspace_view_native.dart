@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/config.dart';
@@ -27,6 +26,7 @@ class WorkspaceView extends StatefulWidget {
 
 class _WorkspaceViewState extends State<WorkspaceView> {
   late final WebViewController _controller;
+  late final void Function() _back;
 
   @override
   void initState() {
@@ -49,13 +49,30 @@ class _WorkspaceViewState extends State<WorkspaceView> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) {
+            if (isSchoolUrl(request.url) &&
+                request.isMainFrame &&
+                [
+                  '/login.php',
+                  '/logout.php',
+                ].contains(Uri.parse(request.url).path)) {
+              if (mounted) {
+                widget.onEvent({
+                  'event': 'error',
+                  'message':
+                      'Your session ended. Close this tool and sign in again.',
+                });
+              }
+              return NavigationDecision.prevent;
+            }
             if (isSchoolUrl(request.url) || request.url == 'about:blank') {
               return NavigationDecision.navigate;
             }
             final uri = Uri.tryParse(request.url);
-            if (uri != null &&
+            if (mounted &&
+                request.isMainFrame &&
+                uri != null &&
                 ['https', 'http', 'tel', 'mailto'].contains(uri.scheme)) {
-              launchUrl(uri, mode: LaunchMode.externalApplication);
+              widget.onEvent({'event': 'external', 'url': request.url});
             }
             return NavigationDecision.prevent;
           },
@@ -73,7 +90,8 @@ class _WorkspaceViewState extends State<WorkspaceView> {
           },
         ),
       );
-    widget.actions.back = () => _controller.runJavaScript('history.back()');
+    _back = () => _controller.runJavaScript('history.back()');
+    widget.actions.back = _back;
     _controller.loadRequest(
       Uri.parse('${AppConfig.baseUrl}/app/open.php'),
       method: LoadRequestMethod.post,
@@ -90,7 +108,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
 
   @override
   void dispose() {
-    widget.actions.back = null;
+    if (identical(widget.actions.back, _back)) widget.actions.back = null;
     super.dispose();
   }
 

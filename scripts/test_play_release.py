@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from play_release import release, version_code
+from play_release import inspect_tracks, release, version_code
 
 
 class Reply:
@@ -27,6 +27,22 @@ class Session:
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_status_is_read_only_and_preserves_review_state(self):
+        class StatusSession(Session):
+            def request(self, method, url, **kwargs):
+                self.calls.append((method, url, kwargs))
+                return Reply({'releases': [{
+                    'releaseName': '1.0.5',
+                    'activeArtifacts': [{'versionCode': 2005}],
+                    'releaseLifecycleState': 'RELEASE_LIFECYCLE_STATE_IN_REVIEW',
+                }]})
+        session = StatusSession()
+        status = inspect_tracks(session)
+        self.assertEqual([c[0] for c in session.calls], ['GET', 'GET'])
+        self.assertTrue(all('/edits' not in c[1] for c in session.calls))
+        self.assertEqual(status['tracks']['production'][0]['releaseLifecycleState'],
+                         'RELEASE_LIFECYCLE_STATE_IN_REVIEW')
+
     def test_promotes_only_tested_version_and_validates_before_commit(self):
         s = Session()
         release(s, 'promote', '1001')

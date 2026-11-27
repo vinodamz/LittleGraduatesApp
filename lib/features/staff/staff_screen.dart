@@ -264,16 +264,6 @@ class _StaffScreenState extends State<StaffScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
-            Text(
-              'People & attendance',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Check in, plan leave, and see who’s here.',
-              style: TextStyle(color: LgColors.muted),
-            ),
-            const SizedBox(height: 16),
             if (day != null)
               Text(day.dateLabel, style: const TextStyle(color: LgColors.muted))
             else
@@ -328,10 +318,16 @@ class _StaffScreenState extends State<StaffScreen> {
                 onOpen: () => _open(day.links.duties, 'duties'),
               ),
               const SizedBox(height: 8),
-              _RosterSection(
-                people: day.roster,
-                filter: _filter,
-                onFilter: (f) => setState(() => _filter = f),
+              ExpansionTile(
+                title: const Text('Team attendance'),
+                subtitle: const Text('See who is here today'),
+                children: [
+                  _RosterSection(
+                    people: day.roster,
+                    filter: _filter,
+                    onFilter: (f) => setState(() => _filter = f),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Card(

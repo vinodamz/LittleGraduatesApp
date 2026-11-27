@@ -61,8 +61,8 @@ class MaterialsScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               day == null
-                  ? 'The shelf list loads from the school.'
-                  : '${day.summary.checked} of ${day.summary.total} checked · a fresh check each day',
+                  ? 'Loading your shelf list…'
+                  : '${day.summary.checked} of ${day.summary.total} checked',
               style: const TextStyle(color: LgColors.muted),
             ),
             const SizedBox(height: 12),
@@ -70,7 +70,7 @@ class MaterialsScreen extends StatelessWidget {
               LgNotice(
                 message: controller.failedCount > 0
                     ? '${controller.pendingCount} saved on this phone. ${controller.failedCount} need a retry.'
-                    : '${controller.pendingCount} saved on this phone — uploading in the background.',
+                    : '${controller.pendingCount} saved on this phone. Waiting to sync.',
                 foreground: controller.failedCount > 0
                     ? LgColors.warn
                     : LgColors.info,
@@ -109,11 +109,6 @@ class MaterialsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Daily shelf check',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: day.summary.total == 0
                             ? 0
@@ -169,7 +164,11 @@ class MaterialsScreen extends StatelessWidget {
                 )
               else
                 for (final entry in controller.shelves.entries) ...[
-                  _ShelfCard(location: entry.key, items: entry.value),
+                  _ShelfCard(
+                    key: ValueKey((day.date, entry.key)),
+                    location: entry.key,
+                    items: entry.value,
+                  ),
                   const SizedBox(height: 12),
                 ],
             ],
@@ -203,7 +202,7 @@ class MaterialsScreen extends StatelessWidget {
 }
 
 class _ShelfCard extends StatelessWidget {
-  const _ShelfCard({required this.location, required this.items});
+  const _ShelfCard({super.key, required this.location, required this.items});
 
   final String location;
   final List<MaterialItem> items;
@@ -237,7 +236,8 @@ class _ShelfCard extends StatelessWidget {
                   ),
               ],
             ),
-            for (final item in items) _MaterialTile(item: item),
+            for (final item in items)
+              _MaterialTile(key: ValueKey(item.id), item: item),
           ],
         ),
       ),
@@ -271,7 +271,7 @@ class _ShelfCard extends StatelessWidget {
 }
 
 class _MaterialTile extends StatefulWidget {
-  const _MaterialTile({required this.item});
+  const _MaterialTile({super.key, required this.item});
 
   final MaterialItem item;
 
@@ -461,7 +461,9 @@ class _MaterialTileState extends State<_MaterialTile> {
               hintText: 'Comment (optional)',
               counterText: '',
             ),
-            onChanged: (_) {
+            onChanged: (notes) {
+              // Persist the draft now; debounce only its network upload.
+              controller.setNotes(widget.item.id, notes, sync: false);
               _debounce?.cancel();
               _debounce = Timer(
                 const Duration(milliseconds: 1200),

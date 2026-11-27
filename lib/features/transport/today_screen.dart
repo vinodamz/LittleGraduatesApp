@@ -191,6 +191,7 @@ class _TransportTodayScreenState extends State<TransportTodayScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
           children: [
             Row(

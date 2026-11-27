@@ -2,12 +2,14 @@ App: Little Graduates
 Package: in.thelittlegraduates.app
 Short description: Staff tools and school transport tracking for Little Graduates.
 
-Little Graduates helps authorized school staff and transport drivers access their daily work tools.
+Little Graduates helps authorized adult school staff and transport drivers manage their daily school work.
 
-Sign in with your existing Little Graduates staff name and PIN to see the modules available to your account.
+Sign in with your school-provided staff account and PIN. The Today and School tabs show the tools available to your account, with search for school tools.
 
-Transport drivers can view scheduled pickup and drop trips, start and finish trips, and mark children as picked up, dropped off, or absent. During an active trip, the app shares the vehicle location with the school transport system so families can follow their child’s cab through their private tracking link. Location tracking continues while the screen is off and stops when the trip is finished or cancelled.
+Transport drivers can view scheduled pickup and drop trips, start and finish trips, and mark children as picked up, dropped off or absent. During an active driver trip, the app collects and shares precise location with the school transport system so staff and families can follow the cab through their private tracking link. Tracking continues when the app is in the background or the screen is off, with an ongoing notification. It stops when the trip is finished, cancelled or stopped locally. Location permission and the in-app sharing disclosure are part of starting driver tracking.
 
-Other staff modules open the corresponding Little Graduates MTT web pages.
+Staff can use attendance and leave tools and check classroom materials. Materials checks support condition notes, photos and videos, with an offline queue for pending work. Uploads can retry when connectivity returns; some video preparation requires reopening the app.
 
-This app requires an account provided by Little Graduates. Location permissions are needed for driver trip tracking.
+Permitted student, assessment, admissions, fees, expenses, inventory, planning and other school tools open in an authenticated in-app workspace. Selected external integrations and public calculator or receipt links open in the browser when you choose them.
+
+This app requires an account provided by Little Graduates. Available tools depend on your school account permissions. Driver location permissions are needed for trip tracking; most school tools require an internet connection.

@@ -51,14 +51,17 @@ void materialsCallbackDispatcher() {
 
 Future<bool> drainMaterialsInBackground() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final store = await SqliteMaterialsStore.open();
+  final registry = await SqliteMaterialsStore.open();
+  final userId = int.tryParse(await registry.getMeta('active_user') ?? '');
+  if (userId == null) return false;
+  final store = await SqliteMaterialsStore.open(userId: userId);
   final token = await store.getMeta('token');
   if (token == null || token.isEmpty) return false;
   final docs = await getApplicationDocumentsDirectory();
   final api = ApiClient()..token = token;
   final queue = MaterialsQueue(
     store: store,
-    root: Directory('${docs.path}/materials_outbox'),
+    root: Directory('${docs.path}/materials_outbox/$userId'),
     transport: ApiMaterialsTransport(MaterialsApi(api), baseUrl: AppConfig.baseUrl, token: () => token),
     bridge: ChannelMaterialsBridge(),
     scheduler: const NoopScheduler(),

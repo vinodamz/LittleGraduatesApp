@@ -17,6 +17,7 @@ import '../transport/location_tracker.dart';
 import '../transport/today_screen.dart';
 import '../transport/transport_api.dart';
 import '../transport/trip_screen.dart';
+import 'school_catalog.dart';
 
 /// The signed-in landing tab: greeting, a live trip, attendance, and the
 /// next runs. Other modules live under More.
@@ -160,10 +161,7 @@ class _TodayScreenState extends State<TodayScreen> {
       for (final t in _trips ?? const <TripSummary>[])
         if (t.status != 'completed' && t.status != 'cancelled') t,
     ];
-    final others = [
-      for (final m in session.modules)
-        if (m.key != 'transport' && m.key != 'staff' && m.key != 'materials') m,
-    ];
+    final shortcuts = dailyShortcuts(session.modules);
 
     return Scaffold(
       appBar: AppBar(
@@ -189,37 +187,18 @@ class _TodayScreenState extends State<TodayScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: LgColors.indigo,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    formatLongDate(now),
-                    style: const TextStyle(color: Color(0xFFE2DBE8)),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user == null
-                        ? greetingFor(now)
-                        : '${greetingFor(now)}, ${firstName(user.name)}',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.headlineMedium?.copyWith(color: Colors.white),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your attendance, school checks, and trips in one place.',
-                    style: TextStyle(color: Color(0xFFE2DBE8), height: 1.5),
-                  ),
-                ],
-              ),
+            Text(
+              user == null
+                  ? greetingFor(now)
+                  : '${greetingFor(now)}, ${firstName(user.name)}',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
+            Text(
+              formatLongDate(now),
+              style: const TextStyle(color: LgColors.muted),
+            ),
+            const SizedBox(height: 16),
             if (tracker.active) ...[
               _LiveTripBanner(
                 routeName: tracker.routeName,
@@ -229,73 +208,6 @@ class _TodayScreenState extends State<TodayScreen> {
             ],
             if (session.modules.any((m) => m.key == 'materials'))
               _MaterialsUploadBanner(pending: materialsPending),
-            if (session.modules.isNotEmpty) ...[
-              const LgSectionTitle('Your day at a glance'),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final columns =
-                      MediaQuery.textScalerOf(context).scale(16) > 24 &&
-                          constraints.maxWidth < 600
-                      ? 2
-                      : 3;
-                  final width =
-                      (constraints.maxWidth - (columns - 1) * 12) / columns;
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      if (_hasTransport)
-                        SizedBox(
-                          width: width,
-                          child: _OverviewTile(
-                            icon: Icons.directions_bus_outlined,
-                            value: _tripError != null
-                                ? 'Unavailable'
-                                : _trips == null
-                                ? 'Loading…'
-                                : '${upcoming.length}',
-                            label: 'Trips ahead',
-                            onTap: () =>
-                                LgNav.maybeOf(context)?.go('transport'),
-                          ),
-                        ),
-                      if (_hasStaff)
-                        SizedBox(
-                          width: width,
-                          child: _OverviewTile(
-                            icon: Icons.badge_outlined,
-                            value: _staffError != null
-                                ? 'Unavailable'
-                                : _staff == null
-                                ? 'Loading…'
-                                : _staff!.attendance.checkedOut
-                                ? 'Done'
-                                : _staff!.attendance.checkedIn
-                                ? 'Present'
-                                : 'Not in',
-                            label: 'Attendance',
-                            onTap: () => LgNav.maybeOf(context)?.go('staff'),
-                          ),
-                        ),
-                      if (session.modules.any((m) => m.key == 'materials'))
-                        SizedBox(
-                          width: width,
-                          child: _OverviewTile(
-                            icon: Icons.fact_check_outlined,
-                            value: materials.day == null
-                                ? 'Not loaded'
-                                : '${materials.day!.summary.checked}/${materials.day!.summary.total}',
-                            label: 'Shelf checks',
-                            onTap: () =>
-                                LgNav.maybeOf(context)?.go('materials'),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
             if (_staffError != null) ...[
               LgNotice(
                 message: _staffError!,
@@ -321,67 +233,19 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
               const SizedBox(height: 20),
             ],
-            if (session.modules.any(
-              (m) => nativeModuleScreens.containsKey(m.key),
-            )) ...[
+            if (shortcuts.isNotEmpty)
               LgSectionTitle(
-                'Quick access',
+                'Daily work',
                 trailing: TextButton(
                   onPressed: () => LgNav.maybeOf(context)?.go('more'),
                   child: const Text('All tools'),
                 ),
               ),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth >= 600
-                      ? (constraints.maxWidth - 24) / 3
-                      : (constraints.maxWidth - 12) / 2;
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (final m in session.modules.where(
-                        (m) =>
-                            m.key == 'transport' ||
-                            m.key == 'staff' ||
-                            m.key == 'materials',
-                      ))
-                        SizedBox(
-                          width: width,
-                          child: Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: () => openModule(context, m),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      moduleIcons[m.key],
-                                      color: LgColors.accent,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        m.label,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
+            for (final module in shortcuts) ...[
+              ModuleRow(module: module),
+              const SizedBox(height: 8),
             ],
+            const SizedBox(height: 8),
             if (_hasTransport) ...[
               LgSectionTitle(
                 'Transport',
@@ -420,7 +284,7 @@ class _TodayScreenState extends State<TodayScreen> {
                       : 'Open Transport if you need to review a finished run.',
                 )
               else
-                for (final t in upcoming.take(3)) ...[
+                for (final t in upcoming.take(1)) ...[
                   TripRunCard(
                     trip: t,
                     onTap: () => openTripSummary(context, t),
@@ -428,13 +292,6 @@ class _TodayScreenState extends State<TodayScreen> {
                   const SizedBox(height: 10),
                 ],
               const SizedBox(height: 8),
-            ],
-            if (others.isNotEmpty) ...[
-              const LgSectionTitle('Also on your desk'),
-              for (final m in others) ...[
-                ModuleRow(module: m),
-                const SizedBox(height: 8),
-              ],
             ],
             if (session.modules.isEmpty)
               const LgEmptyState(
@@ -526,8 +383,8 @@ class _MaterialsUploadBanner extends StatelessWidget {
                 Expanded(
                   child: Text(
                     pending == 1
-                        ? '1 material check is still uploading'
-                        : '$pending material checks are still uploading',
+                        ? '1 saved check waiting to sync'
+                        : '$pending saved checks waiting to sync',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       color: LgColors.info,
@@ -644,7 +501,7 @@ class _MoreScreenState extends State<MoreScreen> {
           m,
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('School workspace')),
+      appBar: AppBar(title: const Text('School tools')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
@@ -672,16 +529,6 @@ class _MoreScreenState extends State<MoreScreen> {
             ),
             const SizedBox(height: 20),
           ],
-          Text(
-            'Everything in one place',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Find the tools you need to keep school running.',
-            style: TextStyle(color: LgColors.muted),
-          ),
-          const SizedBox(height: 20),
           TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
@@ -706,11 +553,31 @@ class _MoreScreenState extends State<MoreScreen> {
               message:
                   'Try another search. Your admin controls which tools you can access.',
             )
-          else
+          else if (_search.text.trim().isNotEmpty)
             for (final m in modules) ...[
               ModuleRow(module: m),
               const SizedBox(height: 8),
-            ],
+            ]
+          else
+            for (final group in groupSchoolModules(modules).entries)
+              ExpansionTile(
+                key: PageStorageKey('school-${group.key}'),
+                initiallyExpanded: group.key == 'Daily work',
+                tilePadding: EdgeInsets.zero,
+                title: Text(
+                  group.key,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  '${group.value.length} ${group.value.length == 1 ? 'tool' : 'tools'}',
+                ),
+                children: [
+                  for (final module in group.value) ...[
+                    ModuleRow(module: module),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => openPrivacyPolicy(context),
@@ -767,42 +634,18 @@ String moduleDescription(String key, bool inApp) => switch (key) {
   'plans' => 'Planning & class schedules',
   'daycare' => 'Daycare routines & records',
   'recruitment' => 'Candidates & hiring',
+  'wacrm' => 'WhatsApp conversations & leads',
+  'n8n' => 'School automations & workflows',
+  'my_day' => 'Class attendance, assessments & daily work',
+  'duties' => 'Assigned checklists & daily responsibilities',
+  'my_leave' => 'Your leave balance, applications & history',
+  'notifications' => 'Alerts, reminders & notification preferences',
+  'money' => 'Collections, dues & school spending',
+  'duties_admin' => 'Assign duties & review completion',
+  'feedback' => 'Review parent feedback',
+  'surveys' => 'Create surveys & review responses',
+  'grades' => 'Manage grade levels',
+  'mcp_admin' => 'Manage API access & integrations',
+  'admin' => 'Users, permissions & school settings',
   _ => inApp ? 'Open school tool' : 'Open school tool',
 };
-
-class _OverviewTile extends StatelessWidget {
-  const _OverviewTile({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String value;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: LgColors.accent, size: 24),
-            const SizedBox(height: 16),
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(color: LgColors.muted, fontSize: 13),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}

@@ -115,9 +115,6 @@ class LocationTracker extends ChangeNotifier {
               'heading': pos.heading,
               't': pos.timestamp.millisecondsSinceEpoch,
             });
-            if (_buffer.length > 500) {
-              _buffer.removeRange(0, _buffer.length - 500);
-            }
             notifyListeners();
           },
           onError: (Object e) {
@@ -133,12 +130,16 @@ class LocationTracker extends ChangeNotifier {
     return null;
   }
 
-  Future<void> stop() async {
+  Future<void> stop({bool flush = true}) async {
     await _positions?.cancel();
     _positions = null;
     _uploader?.cancel();
     _uploader = null;
-    if (_buffer.isNotEmpty) await upload();
+    while (flush && _buffer.isNotEmpty && !_uploading) {
+      final pending = _buffer.length;
+      await upload();
+      if (_buffer.length >= pending) break;
+    }
     _buffer.clear();
     tripId = null;
     lastFix = null;
@@ -149,12 +150,13 @@ class LocationTracker extends ChangeNotifier {
     final id = tripId;
     if (id == null || _uploading || _buffer.isEmpty) return;
     _uploading = true;
-    final batch = List<Map<String, dynamic>>.of(_buffer);
+    final batch = List<Map<String, dynamic>>.of(_buffer.take(500));
     try {
       final d = await api.post('transport/location.php', {
         'trip_id': id,
         'points': batch,
       });
+      if (tripId != id) return;
       _buffer.removeRange(0, batch.length.clamp(0, _buffer.length));
       lastUploadAt = DateTime.now();
       problem = null;
@@ -200,14 +202,14 @@ class LocationTracker extends ChangeNotifier {
           id * 2,
           'Reached ${s.firstName}\'s stop',
           'Tap to tell the family on WhatsApp',
-          payload: '$id',
+          payload: '$tripId:$id',
         );
       } else {
         await Notifications.show(
           id * 2 + 1,
           '${s.firstName} is about 5 minutes away',
           'Tap to send the 5-minute WhatsApp',
-          payload: '$id',
+          payload: '$tripId:$id',
         );
       }
     }

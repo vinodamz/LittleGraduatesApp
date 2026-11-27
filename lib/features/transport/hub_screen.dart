@@ -23,18 +23,14 @@ class TransportHubScreen extends StatelessWidget {
     final admin = context.watch<Session>().user?.isAdmin ?? false;
     final tabs = admin
         ? const [
-            ('Overview', OverviewScreen()),
-            ('Live', LiveScreen()),
             ('Trips', TransportTodayScreen(embedded: true)),
-            ('Students', RosterScreen()),
-            ('More', _TransportMore()),
+            ('Live map', LiveScreen()),
+            ('Tools', _TransportMore()),
           ]
         : const [
             ('My trip', TransportTodayScreen(embedded: true)),
-            ('Live', LiveScreen()),
-            ('Passengers', RosterScreen()),
-            ('Arrivals', RosterScreen(arrivals: true)),
-            ('Messages', MessagesScreen()),
+            ('Live map', LiveScreen()),
+            ('Tools', _TransportMore()),
           ];
     return DefaultTabController(
       length: tabs.length,
@@ -75,8 +71,20 @@ class _TransportMore extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final admin = context.watch<Session>().user?.isAdmin ?? false;
     return ListView(
       children: [
+        if (admin)
+          ListTile(
+            leading: const Icon(Icons.dashboard_rounded),
+            title: const Text('Overview'),
+            onTap: () => _open(context, 'Overview', const OverviewScreen()),
+          ),
+        ListTile(
+          leading: const Icon(Icons.people_rounded),
+          title: const Text('Passengers'),
+          onTap: () => _open(context, 'Passengers', const RosterScreen()),
+        ),
         ListTile(
           leading: const Icon(Icons.forum_rounded),
           title: const Text('Messages'),
@@ -90,19 +98,21 @@ class _TransportMore extends StatelessWidget {
           onTap: () =>
               _open(context, 'Arrivals', const RosterScreen(arrivals: true)),
         ),
-        ListTile(
-          leading: const Icon(Icons.insights_rounded),
-          title: const Text('Reports'),
-          subtitle: const Text('This week’s trips'),
-          onTap: () => _open(context, 'Reports', const ReportsScreen()),
-        ),
-        ListTile(
-          leading: const Icon(Icons.tune_rounded),
-          title: const Text('Settings'),
-          subtitle: const Text('Parent alerts, speed and trip history'),
-          onTap: () =>
-              _open(context, 'Settings', const TransportSettingsScreen()),
-        ),
+        if (admin)
+          ListTile(
+            leading: const Icon(Icons.insights_rounded),
+            title: const Text('Reports'),
+            subtitle: const Text('This week’s trips'),
+            onTap: () => _open(context, 'Reports', const ReportsScreen()),
+          ),
+        if (admin)
+          ListTile(
+            leading: const Icon(Icons.tune_rounded),
+            title: const Text('Settings'),
+            subtitle: const Text('Parent alerts, speed and trip history'),
+            onTap: () =>
+                _open(context, 'Settings', const TransportSettingsScreen()),
+          ),
       ],
     );
   }
