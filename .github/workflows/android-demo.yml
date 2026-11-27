@@ -1,0 +1,77 @@
+name: Android upload demonstration
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/android-demo.yml'
+      - 'scripts/android_demo/**'
+      - 'tools/demo_backend/**'
+  workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: 'Full MTT source commit SHA for the isolated synthetic database'
+        required: true
+        type: string
+        default: '19c07a772cf12e4d9c36ca4cd8712f31c83b494c'
+permissions:
+  contents: read
+concurrency:
+  group: android-demo-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  record:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      DEMO_OUTPUT: /tmp/lg-android-demo-evidence
+      DEMO_RUNTIME: /tmp/lg-android-demo
+      DEMO_UPLOAD_DELAY_SECONDS: '30'
+      BACKEND_REF: ${{ inputs.backend_ref || '19c07a772cf12e4d9c36ca4cd8712f31c83b494c' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate immutable fixture revision
+        shell: bash
+        run: '[[ "$BACKEND_REF" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: vinodamz/MontessoriTraineeTeacher
+          ref: ${{ inputs.backend_ref }}
+          path: .demo-mtt
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - name: Prepare runner and isolated real backend
+        run: bash scripts/android_demo/setup.sh
+      - name: Check recording driver
+        run: python3 -m unittest discover -s scripts/android_demo -p 'test_*.py' -v
+      - run: flutter pub get --enforce-lockfile
+      - name: Build actual app with local demo backend
+        run: flutter build apk --debug --target-platform android-x64 --dart-define=LG_BASE_URL=http://10.0.2.2:8765
+      - name: Record real photo selection and background upload
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2 verified upstream commit
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          disable-animations: true
+          disable-linux-hw-accel: false
+          script: bash scripts/android_demo/run.sh
+      - name: Stop isolated backend and collect safe logs
+        if: always()
+        run: bash scripts/android_demo/finish.sh
+      - name: Upload recording and evidence (including failures)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-datasync-demo-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.DEMO_OUTPUT }}
+          if-no-files-found: error
+          retention-days: 14
