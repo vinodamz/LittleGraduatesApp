@@ -1,3 +1,4 @@
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -93,21 +94,59 @@ Future<bool> drainMaterialsInBackground() async {
   return outcome.retry;
 }
 
+// Public bionic API since Android 29; older releases have no exported symbol.
+// https://android.googlesource.com/platform/bionic/+/main/libc/include/android/api-level.h
+int _androidApiLevel() {
+  try {
+    return DynamicLibrary.open(
+      'libc.so',
+    ).lookupFunction<Int32 Function(), int Function()>(
+      'android_get_device_api_level',
+    )();
+  } on ArgumentError {
+    return 0;
+  }
+}
+
 class WorkmanagerMaterialsScheduler implements UploadScheduler {
+  WorkmanagerMaterialsScheduler({
+    bool? isAndroid,
+    bool? isIOS,
+    int Function()? androidApiLevel,
+  }) : _isAndroid = isAndroid ?? Platform.isAndroid,
+       _isIOS = isIOS ?? Platform.isIOS,
+       _apiLevel = androidApiLevel ?? _androidApiLevel;
+
+  final bool _isAndroid;
+  final bool _isIOS;
+  final int Function() _apiLevel;
+
   @override
   Future<void> schedule() async {
-    if (Platform.isAndroid) {
+    if (_isAndroid) {
       try {
         await Notifications.requestPermission();
       } catch (error) {
-        debugPrint('materials notification permission: ${materialsFailureReason(error)}');
+        debugPrint(
+          'materials notification permission: ${materialsFailureReason(error)}',
+        );
       }
     }
     try {
+      // BackgroundWorker always calls setForegroundAsync when configured.
+      // API 31+ needs an expedited job to start this FGS from the background.
+      // Before 31, keep normal work: this plugin has no getForegroundInfoAsync
+      // override for WorkManager's older expedited-work implementation.
+      final expedited = _isAndroid && _apiLevel() >= 31;
       await Workmanager().registerOneOffTask(
         materialsOneOffTask,
         materialsOneOffTask,
         existingWorkPolicy: ExistingWorkPolicy.keep,
+        expedited: expedited,
+        // Never downgrade a configured FGS to ordinary background work: it
+        // would repeat the denied start. SQLite and periodic work retain/retry
+        // the upload if expedited quota is unavailable.
+        outOfQuotaPolicy: expedited ? OutOfQuotaPolicy.dropWorkRequest : null,
         constraints: Constraints(networkType: NetworkType.connected),
         backoffPolicy: BackoffPolicy.exponential,
         backoffPolicyDelay: const Duration(seconds: 30),
@@ -121,7 +160,7 @@ class WorkmanagerMaterialsScheduler implements UploadScheduler {
     } catch (_) {
       // The in-process queue still runs. The next launch schedules again.
     }
-    if (!Platform.isIOS) return;
+    if (!_isIOS) return;
     try {
       await Workmanager().registerProcessingTask(
         materialsProcessingTask,

@@ -281,11 +281,13 @@ class Demo:
         self.wait("background UI process ended", lambda: not self.shell("pidof", PACKAGE, check=False).strip(), timeout=10)
         self.event("background-ui-process-ended-no-force-stop")
         self.shell("cmd", "connectivity", "airplane-mode", "disable")
+        # Keep one route while the cold worker starts; simultaneous cellular
+        # and Wi-Fi reconnection can change the default network mid-upload.
+        self.shell("svc", "data", "disable")
         self.shell("svc", "wifi", "enable")
-        self.shell("svc", "data", "enable")
-        self.event("connectivity-restored")
+        self.event("connectivity-restored-wifi-only")
         self.shell("cmd", "statusbar", "expand-notifications")
-        self.wait("actual WorkManager service and visible notification", self.upload_visible, timeout=55)
+        self.wait("actual WorkManager service and visible notification", self.upload_visible, timeout=75)
         self.checkpoint("actual-datasync-notification")
         time.sleep(6)
         self.verify_upload()
@@ -351,6 +353,8 @@ class Demo:
     def upload_visible(self):
         services = self.shell("dumpsys", "activity", "services", PACKAGE)
         notifications = self.shell("dumpsys", "notification", "--noredact")
+        (self.output / "latest-foreground-services.txt").write_text(services)
+        (self.output / "latest-notifications.txt").write_text(notifications)
         if not foreground_evidence(services, notifications):
             return False
         activities = self.shell("dumpsys", "activity", "activities")

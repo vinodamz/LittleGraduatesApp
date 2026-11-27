@@ -47,11 +47,14 @@ it would allow requests to bypass the emulator's offline network condition.
 4. Read the app's outbox without modifying it. Require a prepared photo in a
    retryable state after an actual failed foreground upload attempt; hash its bytes.
 5. Press Home, terminate the background UI process with `am kill` (never
-   `force-stop`), and restore connectivity. Let the already-scheduled worker run;
+   `force-stop`), and restore Wi-Fi with cellular data left disabled to avoid a
+   default-network handover. Let the already-scheduled worker run;
    do not force a job, post a notification, or inject queue records.
 6. Expand the real notification shade. Require the visible app notification,
    ID 71041, and WorkManager's `SystemForegroundService` with DataSync type bit
    and `isForeground=true`, while the app Activity is not resumed.
+   Wait up to 75 seconds, still subject to the continuous recording's 170-second
+   guard. Retain the latest service/notification dumps even when this gate fails.
 7. Verify real MTT media readback matches the queued photo's SHA-256; reopen
    Materials, wait for the queue to drain and record the reloaded screen.
 
