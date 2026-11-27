@@ -1,11 +1,12 @@
 """Host-side tests for evidence gates; these are not emulator/video evidence."""
 import tempfile
+import subprocess
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
-from driver import Demo, PACKAGE, SERVICE, bounds, foreground_evidence, picker_photo, select
+from driver import Demo, PACKAGE, SERVICE, UiNotReady, bounds, foreground_evidence, picker_photo, select
 
 
 def tree(nodes):
@@ -59,6 +60,31 @@ class DriverTests(unittest.TestCase):
         demo.record_started = None
         node = tree([{"text": "6"}])[0]
         self.assertIs(demo.wait("leaf node", lambda: node, timeout=1), node)
+
+    def test_cold_start_retries_missing_root_and_preserves_stderr(self):
+        demo = Demo.__new__(Demo)
+        demo.record_started = None
+        xml = '<hierarchy><node text="Demo Materials Teacher" /></hierarchy>'
+        with tempfile.TemporaryDirectory() as folder:
+            demo.output = Path(folder)
+            with patch.object(demo, "shell", side_effect=["", "", "", xml]) as shell, \
+                    patch("driver.subprocess.run", side_effect=[
+                        subprocess.CompletedProcess([], 0, "", "ERROR: null root node returned by UiTestAutomationBridge"),
+                        subprocess.CompletedProcess([], 0, "", "UI hierarchy dumped to: /sdcard/lg-window.xml")]), \
+                    patch("driver.time.sleep"):
+                result = demo.wait("cold launch", demo.tree, timeout=1)
+            self.assertEqual(result[0].get("text"), "Demo Materials Teacher")
+            self.assertEqual(sum(call.args[:2] == ("rm", "-f") for call in shell.call_args_list), 2)
+            self.assertIn("null root node", (demo.output / "uiautomator.log").read_text())
+
+    def test_failed_dump_cannot_be_used_for_taps(self):
+        demo = Demo.__new__(Demo)
+        with tempfile.TemporaryDirectory() as folder:
+            demo.output = Path(folder)
+            with patch.object(demo, "shell", side_effect=["", ""]), \
+                    patch("driver.subprocess.run", return_value=subprocess.CompletedProcess([], 0, "", "ERROR: no root")):
+                with self.assertRaises(UiNotReady):
+                    demo.tree()
 
     def test_checkpoint_writes_real_capture_and_xml(self):
         demo = Demo.__new__(Demo)

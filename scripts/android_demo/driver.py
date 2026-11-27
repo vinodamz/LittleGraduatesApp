@@ -20,6 +20,10 @@ SERVICE = "androidx.work.impl.foreground.SystemForegroundService"
 BASE = "http://127.0.0.1:8765"
 
 
+class UiNotReady(RuntimeError):
+    """The active window has not exposed a fresh accessibility tree yet."""
+
+
 def bounds(node):
     match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
     if not match:
@@ -97,10 +101,18 @@ class Demo:
         return self.adb("shell", *args, **kwargs)
 
     def tree(self):
-        result = self.shell("uiautomator", "dump", "--compressed", "/sdcard/lg-window.xml")
-        if "dumped" not in result.lower():
-            raise RuntimeError("UIAutomator did not produce a fresh accessibility tree: " + result)
-        xml = self.shell("cat", "/sdcard/lg-window.xml")
+        # A cold Flutter launch can have no active accessibility root yet.
+        # Remove our previous dump so a retry can never accept stale nodes.
+        self.shell("rm", "-f", "/sdcard/lg-window.xml")
+        result = subprocess.run(
+            ["adb", "shell", "uiautomator", "dump", "--compressed", "/sdcard/lg-window.xml"],
+            capture_output=True, text=True, timeout=20)
+        diagnostic = (result.stdout + result.stderr).strip()
+        with (self.output / "uiautomator.log").open("a") as log:
+            log.write(f"exit={result.returncode} {diagnostic}\n")
+        xml = self.shell("cat", "/sdcard/lg-window.xml", check=False)
+        if result.returncode != 0 or not xml.strip():
+            raise UiNotReady("No fresh UI tree: " + diagnostic)
         (self.output / "latest-ui.xml").write_text(xml)
         return ET.fromstring(xml)
 
@@ -137,7 +149,7 @@ class Demo:
                 value = fn()
                 if value is not None and value is not False:
                     return value
-            except (ET.ParseError, sqlite3.Error) as error:
+            except (UiNotReady, ET.ParseError, sqlite3.Error) as error:
                 last = str(error)
             time.sleep(.7)
         raise RuntimeError(f"Timed out: {description}; {last or 'required evidence absent'}")
