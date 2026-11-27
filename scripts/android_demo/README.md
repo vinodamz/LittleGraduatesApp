@@ -46,17 +46,24 @@ it would allow requests to bypass the emulator's offline network condition.
    route to `10.0.2.2` is unreachable. Choose the photo using the system picker.
 4. Read the app's outbox without modifying it. Require a prepared photo in a
    retryable state after an actual failed foreground upload attempt; hash its bytes.
-5. Press Home, terminate the background UI process with `am kill` (never
-   `force-stop`), and restore Wi-Fi with cellular data left disabled to avoid a
-   default-network handover. Let the already-scheduled worker run;
-   do not force a job, post a notification, or inject queue records.
-6. Expand the real notification shade. Require the visible app notification,
+5. Keep Materials visible and restore Wi-Fi with cellular data left disabled.
+   Wait for the already-scheduled WorkManager task's actual DataSync foreground
+   service and notification 71041, with the app Activity still resumed. Save
+   service and Activity evidence. Do not kill the process, force a job, post a
+   notification, inject queue records, or change Android's restrictions.
+6. Press Home only after that service starts, then expand the real notification
+   shade. Require the visible app notification,
    ID 71041, and WorkManager's `SystemForegroundService` with DataSync type bit
    and `isForeground=true`, while the app Activity is not resumed.
    Wait up to 75 seconds, still subject to the continuous recording's 170-second
    guard. Retain the latest service/notification dumps even when this gate fails.
 7. Verify real MTT media readback matches the queued photo's SHA-256; reopen
    Materials, wait for the queue to drain and record the reloaded screen.
+
+The earlier cold-process attempts remain failed diagnostic evidence: Android
+denied the foreground-service start. This demonstration covers a service started
+while the user is in the app and continuing after Home; it makes no claim of
+successful cold-restart foreground-service behavior.
 
 All taps use fresh accessibility labels/resource IDs and observed bounds.
 Different picker/semantics behavior fails with screenshots/XML diagnostics;
