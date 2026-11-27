@@ -11,6 +11,7 @@ import 'package:http/testing.dart';
 import 'package:little_graduates/core/api_client.dart';
 import 'package:little_graduates/core/session.dart';
 import 'package:little_graduates/core/theme.dart';
+import 'package:little_graduates/features/home/home_screen.dart';
 import 'package:little_graduates/features/materials/materials_api.dart';
 import 'package:little_graduates/features/materials/materials_controller.dart';
 import 'package:little_graduates/features/shell/app_shell.dart';
@@ -26,19 +27,19 @@ const _modules = [
     'key': 'students',
     'label': 'Students',
     'native': false,
-    'web_url': 'https://example.test/students',
+    'web_url': 'https://mtt.thelittlegraduates.in/students/index.php',
   },
   {
     'key': 'fees',
     'label': 'Fees',
     'native': false,
-    'web_url': 'https://example.test/fees',
+    'web_url': 'https://mtt.thelittlegraduates.in/fees/index.php',
   },
   {
     'key': 'tasks',
     'label': 'Tasks',
     'native': false,
-    'web_url': 'https://example.test/tasks',
+    'web_url': 'https://mtt.thelittlegraduates.in/tasks/index.php',
   },
 ];
 
@@ -170,6 +171,14 @@ void main() {
     expect(find.text('attendance'), findsOneWidget);
     await tester.tap(find.byTooltip('Clear search'));
     await tester.pumpAndSettle();
+    expect(find.text('Fee records & collections'), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text('School office'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('School office'));
+    await tester.pumpAndSettle();
     expect(find.text('Fee records & collections'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -196,6 +205,33 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+    'two main tabs keep native staff tools accessible with a back button',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+      expect(find.byType(NavigationDestination), findsNWidgets(2));
+      expect(find.text('Your day at a glance'), findsNothing);
+      expect(find.text('Quick access'), findsNothing);
+      await tester.tap(find.widgetWithText(NavigationDestination, 'School'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'attendance');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byWidgetPredicate(
+          (widget) => widget is ModuleRow && widget.module.key == 'staff',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(BackButton), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(NavigationDestination), findsNWidgets(2));
+      expect(find.text('attendance'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('attendance failure exposes a retry without blocking the desk', (
     tester,

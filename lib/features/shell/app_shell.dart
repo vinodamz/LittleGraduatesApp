@@ -4,14 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/nav.dart';
+import '../../core/notifications.dart';
+import '../../core/api_client.dart';
+import '../../core/module_registry.dart';
+import '../transport/transport_api.dart';
+import '../transport/trip_screen.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../../core/school_logo.dart';
 import '../home/home_screen.dart';
 import '../materials/materials_controller.dart';
-import '../materials/materials_screen.dart';
-import '../staff/staff_screen.dart';
-import '../transport/hub_screen.dart';
 
 class _Tab {
   const _Tab(this.key, this.label, this.icon, this.page);
@@ -22,7 +24,6 @@ class _Tab {
   final Widget page;
 }
 
-/// Signed-in frame. Today, Transport, Staff and Materials stay one tap apart.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -32,17 +33,50 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   String _selectedKey = 'today';
+  int _todayRevision = 0;
   final Set<String> _visited = {'today'};
+  StreamSubscription<String>? _notificationTaps;
+
+  Future<void> _openNotification(String payload) async {
+    final parts = payload.split(':');
+    if (parts.length != 2) return;
+    final tripId = int.tryParse(parts[0]);
+    final stopId = int.tryParse(parts[1]);
+    if (tripId == null || stopId == null) return;
+    Notifications.pending = null;
+    try {
+      final trip = await TransportApi(context.read<ApiClient>()).trip(tripId);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => TripScreen(initial: trip, focusStopId: stopId),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _notificationTaps = Notifications.taps.listen(_openNotification);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && Notifications.pending != null) {
+        _openNotification(Notifications.pending!);
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _notificationTaps?.cancel();
     super.dispose();
   }
 
@@ -54,30 +88,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   List<_Tab> _tabs(Session session) {
-    final keys = session.modules.map((m) => m.key).toSet();
     return [
       _Tab(
         'today',
         'Today',
         Icons.wb_sunny_rounded,
-        TodayScreen(active: _selectedKey == 'today'),
+        TodayScreen(
+          key: ValueKey(_todayRevision),
+          active: _selectedKey == 'today',
+        ),
       ),
-      if (keys.contains('transport'))
-        const _Tab(
-          'transport',
-          'Transport',
-          Icons.directions_bus_rounded,
-          TransportHubScreen(),
-        ),
-      if (keys.contains('staff'))
-        const _Tab('staff', 'Staff', Icons.badge_rounded, StaffScreen()),
-      if (keys.contains('materials'))
-        const _Tab(
-          'materials',
-          'Materials',
-          Icons.category_rounded,
-          MaterialsScreen(),
-        ),
       const _Tab('more', 'School', Icons.grid_view_rounded, MoreScreen()),
     ];
   }
@@ -89,6 +109,18 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         _selectedKey = key;
         _visited.add(key);
       });
+    } else {
+      final allowed = context.read<Session>().modules.any(
+        (module) => module.key == key,
+      );
+      final builder = nativeModuleScreens[key];
+      if (allowed && builder != null) {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: builder)).then((_) {
+          if (mounted) setState(() => _todayRevision++);
+        });
+      }
     }
   }
 

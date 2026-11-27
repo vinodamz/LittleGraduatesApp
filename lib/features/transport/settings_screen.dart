@@ -33,6 +33,7 @@ class _TransportSettingsScreenState extends State<TransportSettingsScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _error = null);
     try {
       final s = await _api.settings();
       if (!mounted) return;
@@ -47,6 +48,7 @@ class _TransportSettingsScreenState extends State<TransportSettingsScreen> {
   }
 
   Future<void> _save(TransportSettings next) async {
+    final previous = _settings;
     setState(() {
       _settings = next;
       _busy = true;
@@ -58,7 +60,10 @@ class _TransportSettingsScreenState extends State<TransportSettingsScreen> {
       setState(() => _settings = saved);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved.')));
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) {
+        setState(() => _settings = previous);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -70,8 +75,10 @@ class _TransportSettingsScreenState extends State<TransportSettingsScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        if (_error != null)
+        if (_error != null) ...[
           LgNotice(message: _error!, foreground: LgColors.danger, background: LgColors.dangerBg, icon: Icons.error_outline_rounded),
+          TextButton(onPressed: _load, child: const Text('Retry')),
+        ],
         if (s == null && _error == null) const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator())),
         if (s != null) ...[
           Text(s.school, style: Theme.of(context).textTheme.titleMedium),

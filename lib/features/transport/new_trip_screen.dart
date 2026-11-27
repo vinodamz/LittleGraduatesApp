@@ -33,6 +33,7 @@ class _NewTripScreenState extends State<NewTripScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _error = null);
     try {
       final routes = await _api.routes();
       if (mounted) {
@@ -99,9 +100,11 @@ class _NewTripScreenState extends State<NewTripScreen> {
             style: TextStyle(color: LgColors.muted, height: 1.4),
           ),
           const SizedBox(height: 12),
-          if (_error != null)
+          if (_error != null) ...[
             Text(_error!, style: const TextStyle(color: LgColors.danger)),
-          if (routes == null)
+            TextButton(onPressed: _load, child: const Text('Retry')),
+          ],
+          if (routes == null && _error == null)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(child: CircularProgressIndicator()),
@@ -159,6 +162,7 @@ class _CustomTripScreenState extends State<CustomTripScreen> {
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  int _searchVersion = 0;
 
   @override
   void initState() {
@@ -177,13 +181,26 @@ class _CustomTripScreenState extends State<CustomTripScreen> {
 
   void _onSearch() {
     _debounce?.cancel();
+    // Invalidate pending results as soon as the query changes, including
+    // during the debounce interval.
+    _searchVersion++;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     _debounce = Timer(const Duration(milliseconds: 300), () => _load(_search.text));
   }
 
   Future<void> _load(String q) async {
+    final version = ++_searchVersion;
+    setState(() {
+      _children = [];
+      _loading = true;
+      _error = null;
+    });
     try {
       final children = await _api.children(q);
-      if (mounted) {
+      if (mounted && version == _searchVersion) {
         setState(() {
           _children = children;
           _loading = false;
@@ -191,7 +208,7 @@ class _CustomTripScreenState extends State<CustomTripScreen> {
         });
       }
     } on ApiException catch (e) {
-      if (mounted) {
+      if (mounted && version == _searchVersion) {
         setState(() {
           _loading = false;
           _error = e.message;
@@ -269,17 +286,21 @@ class _CustomTripScreenState extends State<CustomTripScreen> {
               ],
             ),
           ),
-          if (_error != null)
+          if (_error != null) ...[
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(_error!, style: const TextStyle(color: LgColors.danger)),
             ),
+            TextButton(onPressed: () => _load(_search.text), child: const Text('Retry')),
+          ],
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                     children: [
+                      if (_error == null && _children.isEmpty)
+                        const ListTile(title: Text('No children match')),
                       for (final c in _children)
                         CheckboxListTile(
                           value: _picked.containsKey(c.id),

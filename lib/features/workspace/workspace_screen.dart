@@ -26,10 +26,39 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   bool _canGoBack = false;
   String? _error;
   int _attempt = 0;
+  String? _boundToken;
+  int? _boundUserId;
+  String? _boundUrl;
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final session = context.watch<Session>();
+    _bindSource(session);
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkspaceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _bindSource(context.read<Session>());
+  }
+
+  void _bindSource(Session session) {
+    if (_boundToken == session.api.token &&
+        _boundUserId == session.user?.id &&
+        _boundUrl == widget.url) {
+      return;
+    }
+    _boundToken = session.api.token;
+    _boundUserId = session.user?.id;
+    _boundUrl = widget.url;
+    // Replacing the view is essential: changing widget fields alone does not
+    // re-run its authenticated POST or remove the previous account's page.
+    _attempt++;
+    _loading = true;
+    _error = null;
+    _canGoBack = false;
+    _actions.back = null;
     _startTimeout();
   }
 
@@ -47,9 +76,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   void _event(Map<String, dynamic> data) {
-    if (!mounted) return;
+    if (!mounted || _error != null) return;
     final session = context.read<Session>();
-    if (data['event'] == 'ready' && data['userId'] != session.user?.id) {
+    if ((data['event'] == 'ready' || data.containsKey('userId')) &&
+        (session.user == null || data['userId'] != session.user?.id)) {
       _fail('Your school account changed. Reopen this tool to continue.');
       return;
     }
@@ -66,15 +96,31 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         _startTimeout();
       case 'error':
         _fail(
-          data['message'] as String? ?? 'Could not open this tool. Try again.',
+          data['message'] is String && (data['message'] as String).isNotEmpty
+              ? data['message'] as String
+              : 'Could not open this tool. Try again.',
         );
       case 'external':
-        final uri = Uri.tryParse(data['url'] as String? ?? '');
-        if (uri != null &&
-            ['https', 'http', 'tel', 'mailto'].contains(uri.scheme)) {
-          launchUrl(uri, mode: LaunchMode.externalApplication);
-        }
+        final value = data['url'];
+        if (value is String) unawaited(_openExternal(value));
     }
+  }
+
+  Future<void> _openExternal(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        !['https', 'http', 'tel', 'mailto'].contains(uri.scheme)) {
+      return;
+    }
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // Keep the current form available when no app can handle the link.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open this link on your device.')),
+    );
   }
 
   void _fail(String message) {
@@ -104,7 +150,10 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
-    final valid = isSchoolUrl(widget.url) && session.api.token != null;
+    final valid =
+        isSchoolUrl(widget.url) &&
+        session.user != null &&
+        (session.api.token?.isNotEmpty ?? false);
     final uri = Uri.tryParse(widget.url);
     final path = uri == null
         ? ''

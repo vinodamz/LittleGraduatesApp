@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'core/platform_init.dart';
 
 import 'core/api_client.dart';
@@ -26,11 +27,12 @@ Future<void> main() async {
   session.addListener(() {
     final token = session.state == SessionState.signedIn ? api.token : null;
     final userId = session.user?.id;
+    if (token == null) unawaited(tracker.stop(flush: false));
     if (haveToken && token == seenToken && userId == seenUserId) return;
     haveToken = true;
     seenToken = token;
     seenUserId = userId;
-    unawaited(materials.rememberToken(token));
+    unawaited(materials.rememberToken(token, userId: userId));
   });
   runApp(
     MultiProvider(
@@ -52,7 +54,10 @@ class LittleGraduatesApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.select<Session, SessionState>((s) => s.state);
+    final userId = context.select<Session, int?>((s) => s.user?.id);
     return MaterialApp(
+      // Drop pushed pages and their controllers at every account boundary.
+      key: ValueKey((state, userId)),
       title: 'Little Graduates',
       theme: buildTheme(),
       debugShowCheckedModeBanner: false,

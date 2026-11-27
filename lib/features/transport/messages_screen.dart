@@ -53,7 +53,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
     setState(() => _busy = true);
     try {
       await _api.send(text, kind: kind);
-      _body.clear();
+      if (!mounted) return;
+      if (_body.text.trim() == text) _body.clear();
       await _load();
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -72,6 +73,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
           child: RefreshIndicator(
             onRefresh: _load,
             child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               children: [
                 if (_error != null)

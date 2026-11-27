@@ -16,13 +16,22 @@ String newMaterialsClientKey() {
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  final key = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  final key =
+      '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   return key;
 }
 
 enum OutboxKind { mark, bulkGood, media }
 
-enum OutboxStatus { pending, compressing, ready, uploading, waiting, failed, uploaded }
+enum OutboxStatus {
+  pending,
+  compressing,
+  ready,
+  uploading,
+  waiting,
+  failed,
+  uploaded,
+}
 
 class OutboxItem {
   OutboxItem({
@@ -102,9 +111,13 @@ class OutboxItem {
       materialId: materialId,
       location: location,
       scope: scope,
-      conditionCode: conditionCode == _keep ? this.conditionCode : conditionCode as String?,
+      conditionCode: conditionCode == _keep
+          ? this.conditionCode
+          : conditionCode as String?,
       notes: notes == _keep ? this.notes : notes as String,
-      originalPath: originalPath == _keep ? this.originalPath : originalPath as String?,
+      originalPath: originalPath == _keep
+          ? this.originalPath
+          : originalPath as String?,
       uploadPath: uploadPath == _keep ? this.uploadPath : uploadPath as String?,
       mediaKind: mediaKind,
       filename: filename == _keep ? this.filename : filename as String,
@@ -112,10 +125,14 @@ class OutboxItem {
       status: status ?? this.status,
       attempts: attempts ?? this.attempts,
       generation: generation ?? this.generation,
-      sentGeneration: sentGeneration == _keep ? this.sentGeneration : sentGeneration as int?,
+      sentGeneration: sentGeneration == _keep
+          ? this.sentGeneration
+          : sentGeneration as int?,
       errorCode: errorCode == _keep ? this.errorCode : errorCode as String?,
       lastError: lastError == _keep ? this.lastError : lastError as String?,
-      uploadChannel: uploadChannel == _keep ? this.uploadChannel : uploadChannel as String,
+      uploadChannel: uploadChannel == _keep
+          ? this.uploadChannel
+          : uploadChannel as String,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -127,7 +144,12 @@ abstract class MaterialsStore {
   Future<OutboxItem?> get(int id);
   Future<OutboxItem> insert(OutboxItem item);
   Future<void> update(OutboxItem item);
-  Future<bool> claim(int id, {required OutboxStatus from, required OutboxStatus to, required DateTime updatedAt});
+  Future<bool> claim(
+    int id, {
+    required OutboxStatus from,
+    required OutboxStatus to,
+    required DateTime updatedAt,
+  });
   Future<void> setMeta(String key, String value);
   Future<String?> getMeta(String key);
   Future<void> requeueAuthFailures(DateTime updatedAt);
@@ -164,7 +186,12 @@ class MemoryMaterialsStore implements MaterialsStore {
   }
 
   @override
-  Future<bool> claim(int id, {required OutboxStatus from, required OutboxStatus to, required DateTime updatedAt}) async {
+  Future<bool> claim(
+    int id, {
+    required OutboxStatus from,
+    required OutboxStatus to,
+    required DateTime updatedAt,
+  }) async {
     final index = items.indexWhere((e) => e.id == id && e.status == from);
     if (index < 0) return false;
     items[index] = items[index].copyWith(status: to, updatedAt: updatedAt);
@@ -182,7 +209,13 @@ class MemoryMaterialsStore implements MaterialsStore {
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
       if (item.status == OutboxStatus.failed && item.errorCode == 'auth') {
-        items[i] = item.copyWith(status: OutboxStatus.pending, attempts: 0, errorCode: null, lastError: null, updatedAt: updatedAt);
+        items[i] = item.copyWith(
+          status: OutboxStatus.pending,
+          attempts: 0,
+          errorCode: null,
+          lastError: null,
+          updatedAt: updatedAt,
+        );
       }
     }
   }
@@ -221,7 +254,12 @@ class BackgroundUploadRequest {
 }
 
 class BackgroundUploadResult {
-  BackgroundUploadResult({required this.clientKey, required this.status, this.body = '', this.error});
+  BackgroundUploadResult({
+    required this.clientKey,
+    required this.status,
+    this.body = '',
+    this.error,
+  });
 
   final String clientKey;
   final int status;
@@ -263,10 +301,12 @@ class UnavailableBridge implements MaterialsBridge {
   Future<VideoInfo?> videoInfo(String path) async => null;
 
   @override
-  Future<void> transcodeVideo(String source, String dest) async => throw NeedsDeviceCompressor();
+  Future<void> transcodeVideo(String source, String dest) async =>
+      throw NeedsDeviceCompressor();
 
   @override
-  Future<void> compressImageNative(String source, String dest) async => throw NeedsDeviceCompressor();
+  Future<void> compressImageNative(String source, String dest) async =>
+      throw NeedsDeviceCompressor();
 
   @override
   Future<void> enqueueBackgroundUpload(BackgroundUploadRequest request) async {}
@@ -297,7 +337,11 @@ abstract class MaterialsTransport {
 }
 
 class ApiMaterialsTransport implements MaterialsTransport {
-  ApiMaterialsTransport(this.materials, {required this.baseUrl, required this.token});
+  ApiMaterialsTransport(
+    this.materials, {
+    required this.baseUrl,
+    required this.token,
+  });
 
   final MaterialsApi materials;
   final String baseUrl;
@@ -316,7 +360,11 @@ class ApiMaterialsTransport implements MaterialsTransport {
 
   @override
   Future<void> bulkGood(OutboxItem item) {
-    return materials.bulkGood(date: item.checkDate, scope: item.scope, clientKey: item.clientKey);
+    return materials.bulkGood(
+      date: item.checkDate,
+      scope: item.scope,
+      clientKey: item.clientKey,
+    );
   }
 
   @override
@@ -337,23 +385,25 @@ class ApiMaterialsTransport implements MaterialsTransport {
     final path = item.uploadPath ?? item.originalPath;
     if (path == null) throw ApiException('The photo is missing on this phone.');
     final auth = token();
-    return bridge.enqueueBackgroundUpload(BackgroundUploadRequest(
-      clientKey: item.clientKey,
-      url: '$baseUrl/api/v1/materials/media.php',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': ApiClient.userAgent,
-        if (auth != null && auth.isNotEmpty) 'Authorization': 'Bearer $auth',
-      },
-      fields: {
-        'material_id': '${item.materialId ?? 0}',
-        'date': item.checkDate,
-        'client_key': item.clientKey,
-      },
-      filePath: path,
-      filename: item.filename.isEmpty ? 'upload.bin' : item.filename,
-      mime: item.mime.isEmpty ? 'application/octet-stream' : item.mime,
-    ));
+    return bridge.enqueueBackgroundUpload(
+      BackgroundUploadRequest(
+        clientKey: item.clientKey,
+        url: '$baseUrl/api/v1/materials/media.php',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': ApiClient.userAgent,
+          if (auth != null && auth.isNotEmpty) 'Authorization': 'Bearer $auth',
+        },
+        fields: {
+          'material_id': '${item.materialId ?? 0}',
+          'date': item.checkDate,
+          'client_key': item.clientKey,
+        },
+        filePath: path,
+        filename: item.filename.isEmpty ? 'upload.bin' : item.filename,
+        mime: item.mime.isEmpty ? 'application/octet-stream' : item.mime,
+      ),
+    );
   }
 }
 
@@ -389,11 +439,37 @@ class MaterialsQueue {
   void Function()? onChanged;
 
   bool _draining = false;
+  bool paused = false;
+  bool get draining => _draining;
   bool _again = false;
+  Future<void> _markWrites = Future.value();
 
   int get _limit => uploadLimitBytes?.call() ?? 40 * 1024 * 1024;
 
   Future<OutboxItem> enqueueMark({
+    required int materialId,
+    required String checkDate,
+    required String location,
+    required String conditionCode,
+    required String notes,
+  }) {
+    // Keystrokes can arrive before the previous disk write finishes.
+    final next = _markWrites
+        .catchError((Object _) {})
+        .then(
+          (_) => _enqueueMark(
+            materialId: materialId,
+            checkDate: checkDate,
+            location: location,
+            conditionCode: conditionCode,
+            notes: notes,
+          ),
+        );
+    _markWrites = next.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return next;
+  }
+
+  Future<OutboxItem> _enqueueMark({
     required int materialId,
     required String checkDate,
     required String location,
@@ -408,25 +484,29 @@ class MaterialsQueue {
     }).toList();
     final OutboxItem saved;
     if (existing.isEmpty) {
-      saved = await store.insert(OutboxItem(
-        clientKey: newMaterialsClientKey(),
-        kind: OutboxKind.mark,
-        checkDate: checkDate,
-        materialId: materialId,
-        location: location,
-        conditionCode: conditionCode,
-        notes: notes,
-        status: OutboxStatus.pending,
-        createdAt: now(),
-        updatedAt: now(),
-      ));
+      saved = await store.insert(
+        OutboxItem(
+          clientKey: newMaterialsClientKey(),
+          kind: OutboxKind.mark,
+          checkDate: checkDate,
+          materialId: materialId,
+          location: location,
+          conditionCode: conditionCode,
+          notes: notes,
+          status: OutboxStatus.pending,
+          createdAt: now(),
+          updatedAt: now(),
+        ),
+      );
     } else {
       final current = existing.first;
       saved = current.copyWith(
         conditionCode: conditionCode,
         notes: notes,
         generation: current.generation + 1,
-        status: current.status == OutboxStatus.uploading ? OutboxStatus.uploading : OutboxStatus.pending,
+        status: current.status == OutboxStatus.uploading
+            ? OutboxStatus.uploading
+            : OutboxStatus.pending,
         errorCode: null,
         lastError: null,
         updatedAt: now(),
@@ -439,7 +519,10 @@ class MaterialsQueue {
     return saved;
   }
 
-  Future<OutboxItem> enqueueBulkGood({required String checkDate, required String scope}) async {
+  Future<OutboxItem> enqueueBulkGood({
+    required String checkDate,
+    required String scope,
+  }) async {
     final open = (await store.all()).where((item) {
       return item.kind == OutboxKind.bulkGood &&
           item.checkDate == checkDate &&
@@ -448,16 +531,18 @@ class MaterialsQueue {
           item.status != OutboxStatus.failed;
     });
     if (open.isNotEmpty) return open.first;
-    final saved = await store.insert(OutboxItem(
-      clientKey: newMaterialsClientKey(),
-      kind: OutboxKind.bulkGood,
-      checkDate: checkDate,
-      scope: scope,
-      conditionCode: 'good',
-      status: OutboxStatus.pending,
-      createdAt: now(),
-      updatedAt: now(),
-    ));
+    final saved = await store.insert(
+      OutboxItem(
+        clientKey: newMaterialsClientKey(),
+        kind: OutboxKind.bulkGood,
+        checkDate: checkDate,
+        scope: scope,
+        conditionCode: 'good',
+        status: OutboxStatus.pending,
+        createdAt: now(),
+        updatedAt: now(),
+      ),
+    );
     await _releaseWaiting(date: checkDate, scope: scope);
     await scheduler.schedule();
     _changed();
@@ -481,20 +566,22 @@ class MaterialsQueue {
     await destDir.create(recursive: true);
     final dest = File('${destDir.path}/$key$ext');
     await source.copy(dest.path);
-    final saved = await store.insert(OutboxItem(
-      clientKey: key,
-      kind: OutboxKind.media,
-      checkDate: checkDate,
-      materialId: materialId,
-      location: location,
-      originalPath: dest.path,
-      mediaKind: mediaKind,
-      filename: filename.isEmpty ? '$mediaKind$ext' : filename,
-      mime: _mimeFor(filename, mediaKind),
-      status: hasCondition ? OutboxStatus.pending : OutboxStatus.waiting,
-      createdAt: now(),
-      updatedAt: now(),
-    ));
+    final saved = await store.insert(
+      OutboxItem(
+        clientKey: key,
+        kind: OutboxKind.media,
+        checkDate: checkDate,
+        materialId: materialId,
+        location: location,
+        originalPath: dest.path,
+        mediaKind: mediaKind,
+        filename: filename.isEmpty ? '$mediaKind$ext' : filename,
+        mime: _mimeFor(filename, mediaKind),
+        status: hasCondition ? OutboxStatus.pending : OutboxStatus.waiting,
+        createdAt: now(),
+        updatedAt: now(),
+      ),
+    );
     await scheduler.schedule();
     _changed();
     return saved;
@@ -503,14 +590,20 @@ class MaterialsQueue {
   Future<void> retry(int id) async {
     final item = await store.get(id);
     if (item == null) return;
-    final status = item.kind == OutboxKind.media && item.uploadPath != null ? OutboxStatus.ready : OutboxStatus.pending;
-    await store.update(item.copyWith(
-      status: item.status == OutboxStatus.waiting ? OutboxStatus.waiting : status,
-      attempts: 0,
-      errorCode: null,
-      lastError: null,
-      updatedAt: now(),
-    ));
+    final status = item.kind == OutboxKind.media && item.uploadPath != null
+        ? OutboxStatus.ready
+        : OutboxStatus.pending;
+    await store.update(
+      item.copyWith(
+        status: item.status == OutboxStatus.waiting
+            ? OutboxStatus.waiting
+            : status,
+        attempts: 0,
+        errorCode: null,
+        lastError: null,
+        updatedAt: now(),
+      ),
+    );
     await scheduler.schedule();
     _changed();
   }
@@ -524,6 +617,7 @@ class MaterialsQueue {
   }
 
   Future<DrainOutcome> drain() async {
+    if (paused) return DrainOutcome();
     if (_draining) {
       _again = true;
       return DrainOutcome();
@@ -536,7 +630,9 @@ class MaterialsQueue {
         if (await _recover()) outcome.uploadedAny = true;
         final skipped = <int>{};
         while (true) {
+          if (paused) break;
           final all = await store.all();
+          if (paused) break;
           final next = _next(all, skipped);
           if (next == null) break;
           final step = await _process(next);
@@ -547,7 +643,7 @@ class MaterialsQueue {
           }
           if (step == _Step.skip && next.id != null) skipped.add(next.id!);
         }
-      } while (_again);
+      } while (_again && !paused);
     } finally {
       _draining = false;
     }
@@ -573,33 +669,52 @@ class MaterialsQueue {
       }
       if (item?.id == null) continue;
       if (result.ok) {
-        if (await _finishSuccess(item!.id!, item.sentGeneration ?? item.generation)) uploaded = true;
+        if (await _finishSuccess(
+          item!.id!,
+          item.sentGeneration ?? item.generation,
+        )) {
+          uploaded = true;
+        }
       } else if (result.body.contains('condition_required')) {
-        await store.update(item!.copyWith(status: OutboxStatus.waiting, lastError: 'Pick a condition to send this.', updatedAt: now()));
+        await store.update(
+          item!.copyWith(
+            status: OutboxStatus.waiting,
+            lastError: 'Pick a condition to send this.',
+            updatedAt: now(),
+          ),
+        );
       } else if (result.status == 401) {
-        await store.update(item!.copyWith(
-          status: OutboxStatus.failed,
-          errorCode: 'auth',
-          lastError: 'Sign in again to finish uploading.',
-          updatedAt: now(),
-        ));
+        await store.update(
+          item!.copyWith(
+            status: OutboxStatus.failed,
+            errorCode: 'auth',
+            lastError: 'Sign in again to finish uploading.',
+            updatedAt: now(),
+          ),
+        );
       } else if (result.status >= 400 && result.status < 500) {
-        await store.update(item!.copyWith(
-          status: OutboxStatus.failed,
-          errorCode: 'permanent',
-          lastError: 'The school server rejected this file.',
-          updatedAt: now(),
-        ));
+        await store.update(
+          item!.copyWith(
+            status: OutboxStatus.failed,
+            errorCode: 'permanent',
+            lastError: 'The school server rejected this file.',
+            updatedAt: now(),
+          ),
+        );
       } else {
-        final back = item!.uploadPath != null ? OutboxStatus.ready : OutboxStatus.pending;
-        await store.update(item.copyWith(
-          status: back,
-          attempts: item.attempts + 1,
-          errorCode: 'network',
-          lastError: result.error ?? 'Upload did not finish.',
-          uploadChannel: '',
-          updatedAt: now(),
-        ));
+        final back = item!.uploadPath != null
+            ? OutboxStatus.ready
+            : OutboxStatus.pending;
+        await store.update(
+          item.copyWith(
+            status: back,
+            attempts: item.attempts + 1,
+            errorCode: 'network',
+            lastError: result.error ?? 'Upload did not finish.',
+            uploadChannel: '',
+            updatedAt: now(),
+          ),
+        );
       }
     }
 
@@ -613,20 +728,32 @@ class MaterialsQueue {
     for (final item in fresh) {
       if (item.id == null) continue;
       if (item.status == OutboxStatus.compressing) {
-        await store.update(item.copyWith(status: OutboxStatus.pending, updatedAt: now()));
+        await store.update(
+          item.copyWith(status: OutboxStatus.pending, updatedAt: now()),
+        );
         continue;
       }
       if (item.status != OutboxStatus.uploading) continue;
       if (item.uploadChannel == 'urlsession') {
         final reported = results.any((r) => r.clientKey == item.clientKey);
         if (!reported && !inflight.contains(item.clientKey)) {
-          await store.update(item.copyWith(status: OutboxStatus.ready, uploadChannel: '', updatedAt: now()));
+          await store.update(
+            item.copyWith(
+              status: OutboxStatus.ready,
+              uploadChannel: '',
+              updatedAt: now(),
+            ),
+          );
         }
         continue;
       }
       if (now().difference(item.updatedAt) > const Duration(minutes: 10)) {
-        final back = item.kind == OutboxKind.media && item.uploadPath != null ? OutboxStatus.ready : OutboxStatus.pending;
-        await store.update(item.copyWith(status: back, uploadChannel: '', updatedAt: now()));
+        final back = item.kind == OutboxKind.media && item.uploadPath != null
+            ? OutboxStatus.ready
+            : OutboxStatus.pending;
+        await store.update(
+          item.copyWith(status: back, uploadChannel: '', updatedAt: now()),
+        );
       }
     }
     return uploaded;
@@ -636,7 +763,10 @@ class MaterialsQueue {
     final candidates = <OutboxItem>[];
     for (final item in all) {
       if (item.id == null || skipped.contains(item.id)) continue;
-      if (item.status != OutboxStatus.pending && item.status != OutboxStatus.ready) continue;
+      if (item.status != OutboxStatus.pending &&
+          item.status != OutboxStatus.ready) {
+        continue;
+      }
       if (item.kind == OutboxKind.media && _blocked(item, all)) continue;
       candidates.add(item);
     }
@@ -650,63 +780,103 @@ class MaterialsQueue {
   }
 
   Future<_Step> _process(OutboxItem item) async {
-    if (item.kind == OutboxKind.media && (item.uploadPath == null || item.uploadPath!.isEmpty)) {
-      final claimed = await store.claim(item.id!, from: OutboxStatus.pending, to: OutboxStatus.compressing, updatedAt: now());
+    if (paused) return _Step.skip;
+    if (item.kind == OutboxKind.media &&
+        (item.uploadPath == null || item.uploadPath!.isEmpty)) {
+      final claimed = await store.claim(
+        item.id!,
+        from: OutboxStatus.pending,
+        to: OutboxStatus.compressing,
+        updatedAt: now(),
+      );
       if (!claimed) return _Step.skip;
       try {
         final prepared = await _prepareMedia(item);
         final current = await store.get(item.id!);
         if (current == null) return _Step.skip;
         if (prepared.tooLarge) {
-          await store.update(current.copyWith(
-            status: OutboxStatus.failed,
-            errorCode: 'permanent',
-            lastError: 'Still too large after compression. Record a shorter video.',
-            updatedAt: now(),
-          ));
+          await store.update(
+            current.copyWith(
+              status: OutboxStatus.failed,
+              errorCode: 'permanent',
+              lastError:
+                  'Still too large after compression. Record a shorter video.',
+              updatedAt: now(),
+            ),
+          );
           _changed();
           return _Step.progress;
         }
-        await store.update(current.copyWith(
-          status: OutboxStatus.ready,
-          uploadPath: prepared.path,
-          filename: prepared.filename,
-          mime: prepared.mime,
-          updatedAt: now(),
-        ));
+        await store.update(
+          current.copyWith(
+            status: OutboxStatus.ready,
+            uploadPath: prepared.path,
+            filename: prepared.filename,
+            mime: prepared.mime,
+            updatedAt: now(),
+          ),
+        );
         _changed();
         return _Step.progress;
       } on NeedsDeviceCompressor {
         final current = await store.get(item.id!);
         if (current != null) {
-          await store.update(current.copyWith(status: OutboxStatus.pending, updatedAt: now()));
+          await store.update(
+            current.copyWith(status: OutboxStatus.pending, updatedAt: now()),
+          );
         }
         return _Step.skip;
       } catch (e) {
         final current = await store.get(item.id!);
         if (current != null) {
           final attempts = current.attempts + 1;
-          await store.update(current.copyWith(
-            status: attempts >= 4 ? OutboxStatus.failed : OutboxStatus.pending,
-            attempts: attempts,
-            errorCode: 'permanent',
-            lastError: 'Could not prepare this file.',
-            updatedAt: now(),
-          ));
+          await store.update(
+            current.copyWith(
+              status: attempts >= 4
+                  ? OutboxStatus.failed
+                  : OutboxStatus.pending,
+              attempts: attempts,
+              errorCode: 'permanent',
+              lastError: 'Could not prepare this file.',
+              updatedAt: now(),
+            ),
+          );
           _changed();
         }
         return _Step.progress;
       }
     }
 
-    final from = item.status == OutboxStatus.ready ? OutboxStatus.ready : OutboxStatus.pending;
-    final claimed = await store.claim(item.id!, from: from, to: OutboxStatus.uploading, updatedAt: now());
+    final from = item.status == OutboxStatus.ready
+        ? OutboxStatus.ready
+        : OutboxStatus.pending;
+    final claimed = await store.claim(
+      item.id!,
+      from: from,
+      to: OutboxStatus.uploading,
+      updatedAt: now(),
+    );
     if (!claimed) return _Step.skip;
     final sending = await store.get(item.id!);
     if (sending == null) return _Step.skip;
-    final channel = sending.kind == OutboxKind.media && bridge.supportsBackgroundUpload ? 'urlsession' : 'dart';
-    await store.update(sending.copyWith(sentGeneration: sending.generation, uploadChannel: channel, updatedAt: now()));
+    final channel =
+        sending.kind == OutboxKind.media && bridge.supportsBackgroundUpload
+        ? 'urlsession'
+        : 'dart';
+    await store.update(
+      sending.copyWith(
+        sentGeneration: sending.generation,
+        uploadChannel: channel,
+        updatedAt: now(),
+      ),
+    );
     final queued = (await store.get(item.id!))!;
+    if (paused) {
+      await store.update(
+        queued.copyWith(status: from, uploadChannel: '', updatedAt: now()),
+      );
+      return _Step.skip;
+    }
     try {
       if (queued.kind == OutboxKind.mark) {
         await transport.mark(queued);
@@ -729,21 +899,30 @@ class MaterialsQueue {
   Future<bool> _finishSuccess(int id, int sentGeneration) async {
     final current = await store.get(id);
     if (current == null) return false;
-    if (current.kind == OutboxKind.mark && current.generation != sentGeneration) {
-      await store.update(current.copyWith(status: OutboxStatus.pending, uploadChannel: '', updatedAt: now()));
+    if (current.kind == OutboxKind.mark &&
+        current.generation != sentGeneration) {
+      await store.update(
+        current.copyWith(
+          status: OutboxStatus.pending,
+          uploadChannel: '',
+          updatedAt: now(),
+        ),
+      );
       _changed();
       return false;
     }
     await _deleteFiles(current);
-    await store.update(current.copyWith(
-      status: OutboxStatus.uploaded,
-      originalPath: null,
-      uploadPath: null,
-      errorCode: null,
-      lastError: null,
-      uploadChannel: '',
-      updatedAt: now(),
-    ));
+    await store.update(
+      current.copyWith(
+        status: OutboxStatus.uploaded,
+        originalPath: null,
+        uploadPath: null,
+        errorCode: null,
+        lastError: null,
+        uploadChannel: '',
+        updatedAt: now(),
+      ),
+    );
     _changed();
     return true;
   }
@@ -752,46 +931,56 @@ class MaterialsQueue {
     final current = await store.get(item.id!);
     if (current == null) return _Step.skip;
     if (error.code == 'condition_required') {
-      await store.update(current.copyWith(
-        status: OutboxStatus.waiting,
-        uploadChannel: '',
-        lastError: 'Pick a condition and this will upload.',
-        updatedAt: now(),
-      ));
+      await store.update(
+        current.copyWith(
+          status: OutboxStatus.waiting,
+          uploadChannel: '',
+          lastError: 'Pick a condition and this will upload.',
+          updatedAt: now(),
+        ),
+      );
       _changed();
       return _Step.progress;
     }
     if (error.isUnauthenticated) {
-      await store.update(current.copyWith(
-        status: OutboxStatus.failed,
-        errorCode: 'auth',
-        uploadChannel: '',
-        lastError: 'Sign in again to finish uploading.',
-        updatedAt: now(),
-      ));
+      await store.update(
+        current.copyWith(
+          status: OutboxStatus.failed,
+          errorCode: 'auth',
+          uploadChannel: '',
+          lastError: 'Sign in again to finish uploading.',
+          updatedAt: now(),
+        ),
+      );
       _changed();
       return _Step.progress;
     }
     if (_permanent(error)) {
-      await store.update(current.copyWith(
-        status: OutboxStatus.failed,
-        errorCode: 'permanent',
-        uploadChannel: '',
-        lastError: error.message,
-        updatedAt: now(),
-      ));
+      await store.update(
+        current.copyWith(
+          status: OutboxStatus.failed,
+          errorCode: 'permanent',
+          uploadChannel: '',
+          lastError: error.message,
+          updatedAt: now(),
+        ),
+      );
       _changed();
       return _Step.progress;
     }
-    final back = current.kind == OutboxKind.media && current.uploadPath != null ? OutboxStatus.ready : OutboxStatus.pending;
-    await store.update(current.copyWith(
-      status: back,
-      attempts: current.attempts + 1,
-      errorCode: 'network',
-      uploadChannel: '',
-      lastError: error.message,
-      updatedAt: now(),
-    ));
+    final back = current.kind == OutboxKind.media && current.uploadPath != null
+        ? OutboxStatus.ready
+        : OutboxStatus.pending;
+    await store.update(
+      current.copyWith(
+        status: back,
+        attempts: current.attempts + 1,
+        errorCode: 'network',
+        uploadChannel: '',
+        lastError: error.message,
+        updatedAt: now(),
+      ),
+    );
     _changed();
     return _Step.retry;
   }
@@ -827,7 +1016,11 @@ class MaterialsQueue {
       info = null;
     }
     final bytes = await original.length();
-    final needs = videoNeedsTranscode(width: info?.width, height: info?.height, bytes: bytes);
+    final needs = videoNeedsTranscode(
+      width: info?.width,
+      height: info?.height,
+      bytes: bytes,
+    );
     if (!needs) {
       final ext = _safeExt(item.filename, 'video');
       final dest = File('${dir.path}/${item.clientKey}$ext');
@@ -851,31 +1044,52 @@ class MaterialsQueue {
     );
   }
 
-  Future<void> _releaseWaiting({required String date, int? materialId, String scope = ''}) async {
+  Future<void> _releaseWaiting({
+    required String date,
+    int? materialId,
+    String scope = '',
+  }) async {
     for (final item in await store.all()) {
-      if (item.kind != OutboxKind.media || item.status != OutboxStatus.waiting || item.checkDate != date) continue;
-      final match = materialId != null ? item.materialId == materialId : (scope.isEmpty || scope == item.location);
+      if (item.kind != OutboxKind.media ||
+          item.status != OutboxStatus.waiting ||
+          item.checkDate != date) {
+        continue;
+      }
+      final match = materialId != null
+          ? item.materialId == materialId
+          : (scope.isEmpty || scope == item.location);
       if (!match || item.id == null) continue;
-      await store.update(item.copyWith(status: OutboxStatus.pending, updatedAt: now()));
+      await store.update(
+        item.copyWith(status: OutboxStatus.pending, updatedAt: now()),
+      );
     }
   }
 
   bool _blocked(OutboxItem media, List<OutboxItem> all) {
     for (final other in all) {
       if (other.id == media.id) continue;
-      if (other.status == OutboxStatus.failed || other.status == OutboxStatus.uploaded) continue;
+      if (other.status == OutboxStatus.failed ||
+          other.status == OutboxStatus.uploaded) {
+        continue;
+      }
       if (other.checkDate != media.checkDate) continue;
-      if (other.kind == OutboxKind.mark && other.materialId == media.materialId) return true;
-      if (other.kind == OutboxKind.bulkGood && (other.scope.isEmpty || other.scope == media.location)) return true;
+      if (other.kind == OutboxKind.mark &&
+          other.materialId == media.materialId) {
+        return true;
+      }
+      if (other.kind == OutboxKind.bulkGood &&
+          (other.scope.isEmpty || other.scope == media.location)) {
+        return true;
+      }
     }
     return false;
   }
 
   int _rank(OutboxKind kind) => switch (kind) {
-        OutboxKind.mark => 0,
-        OutboxKind.bulkGood => 1,
-        OutboxKind.media => 2,
-      };
+    OutboxKind.mark => 0,
+    OutboxKind.bulkGood => 1,
+    OutboxKind.media => 2,
+  };
 
   bool _permanent(ApiException error) {
     if (error.status == 408 || error.status == 429) return false;
@@ -883,7 +1097,10 @@ class MaterialsQueue {
   }
 
   Future<void> _deleteFiles(OutboxItem item) async {
-    final paths = <String>{if (item.originalPath != null) item.originalPath!, if (item.uploadPath != null) item.uploadPath!};
+    final paths = <String>{
+      if (item.originalPath != null) item.originalPath!,
+      if (item.uploadPath != null) item.uploadPath!,
+    };
     for (final path in paths) {
       final file = File(path);
       if (await file.exists()) await file.delete();
@@ -894,7 +1111,12 @@ class MaterialsQueue {
 }
 
 class _Prepared {
-  _Prepared({required this.path, required this.filename, required this.mime, required this.tooLarge});
+  _Prepared({
+    required this.path,
+    required this.filename,
+    required this.mime,
+    required this.tooLarge,
+  });
 
   final String path;
   final String filename;

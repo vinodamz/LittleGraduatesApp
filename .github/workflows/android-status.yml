@@ -1,0 +1,18 @@
+name: Android Play release status
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Same credential boundary as internal releases; select a release tag.
+    environment: google-play-internal
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - run: python3 -m pip install -r scripts/requirements-play.txt
+      - name: Read review state without changing any release
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: python3 scripts/play_release.py status

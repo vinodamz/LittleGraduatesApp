@@ -10,8 +10,8 @@ class SqliteMaterialsStore implements MaterialsStore {
 
   Future<void> close() => _db.close();
 
-  static Future<SqliteMaterialsStore> open({String? path}) async {
-    final dbPath = path ?? p.join(await getDatabasesPath(), 'materials_outbox.db');
+  static Future<SqliteMaterialsStore> open({String? path, int? userId}) async {
+    final dbPath = path ?? p.join(await getDatabasesPath(), userId == null ? 'materials_outbox.db' : 'materials_outbox_$userId.db');
     final db = await openDatabase(
       dbPath,
       version: 1,

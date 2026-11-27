@@ -39,19 +39,32 @@ class MaterialView {
 
 /// The daily sheet plus the phone's upload queue.
 class MaterialsController extends ChangeNotifier {
-  MaterialsController({required this.api, required this.queue, MaterialsDay? initial}) : day = initial {
+  MaterialsController({
+    required this.api,
+    required this.queue,
+    MaterialsDay? initial,
+  }) : day = initial {
     queue.onChanged = _onQueueChanged;
     queue.uploadLimitBytes = () => day?.uploadLimit ?? 40 * 1024 * 1024;
   }
 
-  static Future<MaterialsController> open(ApiClient client) async {
-    final store = await SqliteMaterialsStore.open();
+  static Future<MaterialsController> open(
+    ApiClient client, {
+    int? userId,
+  }) async {
+    final store = await SqliteMaterialsStore.open(userId: userId);
     final docs = await getApplicationDocumentsDirectory();
     final api = MaterialsApi(client);
     final queue = MaterialsQueue(
       store: store,
-      root: Directory('${docs.path}/materials_outbox'),
-      transport: ApiMaterialsTransport(api, baseUrl: AppConfig.baseUrl, token: () => client.token),
+      root: Directory(
+        '${docs.path}/materials_outbox/${userId ?? 'unassigned'}',
+      ),
+      transport: ApiMaterialsTransport(
+        api,
+        baseUrl: AppConfig.baseUrl,
+        token: () => client.token,
+      ),
       bridge: ChannelMaterialsBridge(),
       scheduler: WorkmanagerMaterialsScheduler(),
       compressPhotoBytes: (bytes) => compute(
@@ -60,13 +73,19 @@ class MaterialsController extends ChangeNotifier {
       ),
     );
     final controller = MaterialsController(api: api, queue: queue);
-    await controller._loadCache();
-    await controller.reloadLocal();
+    controller._bound = userId != null;
+    if (userId != null) {
+      await controller._loadCache();
+      await controller.reloadLocal();
+    }
     return controller;
   }
 
-  final MaterialsApi api;
-  final MaterialsQueue queue;
+  MaterialsApi api;
+  MaterialsQueue queue;
+  Future<void> _binding = Future.value();
+  int _bindingVersion = 0;
+  bool _bound = true;
 
   MaterialsDay? day;
   List<OutboxItem> outbox = [];
@@ -78,81 +97,173 @@ class MaterialsController extends ChangeNotifier {
 
   int get pendingCount => outbox.where((item) => item.open).length;
 
-  int get failedCount => outbox.where((item) => item.status == OutboxStatus.failed).length;
+  int get failedCount =>
+      outbox.where((item) => item.status == OutboxStatus.failed).length;
 
-  Future<void> rememberToken(String? token) async {
-    await queue.rememberToken(token);
-    if (token != null && token.isNotEmpty) {
-      await kick();
-    } else {
-      await reloadLocal();
-    }
+  Future<void> rememberToken(String? token, {int? userId}) {
+    final version = ++_bindingVersion;
+    _bound = false;
+    day = null;
+    outbox = [];
+    error = null;
+    loading = false;
+    query = '';
+    location = '';
+    queue.onChanged = null;
+    queue.paused = true;
+    _notify();
+    _binding = _binding
+        .catchError((Object error) {})
+        .then((_) async {
+          final registry = await SqliteMaterialsStore.open();
+          await registry.setMeta('token', '');
+          await registry.setMeta('active_user', '');
+          await queue.rememberToken(null);
+          while (queue.draining) {
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+          }
+          if (version != _bindingVersion || token == null || userId == null) {
+            return;
+          }
+          final client = ApiClient()..token = token;
+          final replacement = await MaterialsController.open(
+            client,
+            userId: userId,
+          );
+          if (version != _bindingVersion) return;
+          api = replacement.api;
+          queue = replacement.queue;
+          queue.onChanged = _onQueueChanged;
+          day = replacement.day;
+          outbox = replacement.outbox;
+          _bound = true;
+          await queue.rememberToken(token);
+          if (!_current(version)) return;
+          await registry.setMeta('active_user', '$userId');
+          if (!_current(version)) return;
+          await kick();
+        })
+        .catchError((Object failure) {
+          if (version == _bindingVersion) {
+            _bound = false;
+            error = 'Could not open your saved checks. Sign in again to retry.';
+            _notify();
+          }
+        });
+    return _binding;
   }
 
   Future<void> kick() async {
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
     await refresh();
-    final outcome = await queue.drain();
+    if (!_current(version)) return;
+    final outcome = await targetQueue.drain();
+    if (!_current(version)) return;
     if (outcome.uploadedAny) await refresh();
     await reloadLocal();
   }
 
   Future<void> refresh() async {
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
     if (day == null) {
       loading = true;
       _notify();
     }
     try {
-      day = await api.today();
+      final fresh = await api.today();
+      if (!_current(version)) return;
+      day = fresh;
       queue.uploadLimitBytes = () => day?.uploadLimit ?? 40 * 1024 * 1024;
-      await queue.store.setMeta('materials_day', jsonEncode(day!.toJson()));
-      await queue.store.purgeUploaded();
+      await targetQueue.store.setMeta(
+        'materials_day',
+        jsonEncode(fresh.toJson()),
+      );
+      if (!_current(version)) return;
+      await targetQueue.store.purgeUploaded();
+      if (!_current(version)) return;
       error = null;
     } on ApiException catch (e) {
+      if (!_current(version)) return;
       error = e.message;
       await _loadCache();
     } finally {
-      loading = false;
-      await reloadLocal();
+      if (_current(version)) {
+        loading = false;
+        await reloadLocal();
+      }
     }
   }
 
-  Future<void> setCondition(int materialId, String conditionCode, String notes) async {
+  Future<void> setCondition(
+    int materialId,
+    String conditionCode,
+    String notes,
+  ) async {
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
     final item = _item(materialId);
     if (item == null || conditionCode.isEmpty) return;
-    await queue.enqueueMark(
+    await targetQueue.enqueueMark(
       materialId: materialId,
       checkDate: _date,
       location: item.location,
       conditionCode: conditionCode,
       notes: notes,
     );
+    if (!_current(version)) return;
     await reloadLocal();
-    await queue.drain();
-    await refresh();
+    await targetQueue.drain();
+    if (_current(version)) await refresh();
   }
 
-  Future<void> setNotes(int materialId, String notes) async {
+  Future<void> setNotes(
+    int materialId,
+    String notes, {
+    bool sync = true,
+  }) async {
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
     final view = viewFor(_item(materialId));
-    if (view == null || view.conditionCode == null || view.conditionCode!.isEmpty) return;
-    if (view.notes == notes && view.mark == null) return;
-    if (view.mark != null && view.mark!.notes == notes && view.mark!.conditionCode == view.conditionCode) return;
-    await queue.enqueueMark(
-      materialId: materialId,
-      checkDate: _date,
-      location: view.item.location,
-      conditionCode: view.conditionCode!,
-      notes: notes,
-    );
+    if (view == null ||
+        view.conditionCode == null ||
+        view.conditionCode!.isEmpty) {
+      return;
+    }
+    if (!sync || view.notes != notes) {
+      await targetQueue.enqueueMark(
+        materialId: materialId,
+        checkDate: _date,
+        location: view.item.location,
+        conditionCode: view.conditionCode!,
+        notes: notes,
+      );
+    }
+    if (!_current(version)) return;
     await reloadLocal();
-    final outcome = await queue.drain();
-    if (outcome.uploadedAny) await refresh();
+    if (!sync || !_current(version)) return;
+    final outcome = await targetQueue.drain();
+    if (_current(version) && outcome.uploadedAny) await refresh();
   }
 
-  Future<void> addMedia(int materialId, {required File source, required String filename, required String mediaKind}) async {
+  Future<void> addMedia(
+    int materialId, {
+    required File source,
+    required String filename,
+    required String mediaKind,
+  }) async {
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
     final item = _item(materialId);
     if (item == null) return;
     final view = viewFor(item);
-    await queue.enqueueMedia(
+    await targetQueue.enqueueMedia(
       materialId: materialId,
       checkDate: _date,
       location: item.location,
@@ -161,23 +272,32 @@ class MaterialsController extends ChangeNotifier {
       mediaKind: mediaKind,
       hasCondition: view?.checked ?? false,
     );
+    if (!_current(version)) return;
     await reloadLocal();
-    final outcome = await queue.drain();
-    if (outcome.uploadedAny) await refresh();
+    final outcome = await targetQueue.drain();
+    if (_current(version) && outcome.uploadedAny) await refresh();
   }
 
   Future<void> markRestGood(String shelf) async {
-    await queue.enqueueBulkGood(checkDate: _date, scope: shelf);
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
+    await targetQueue.enqueueBulkGood(checkDate: _date, scope: shelf);
+    if (!_current(version)) return;
     await reloadLocal();
-    final outcome = await queue.drain();
-    if (outcome.uploadedAny) await refresh();
+    final outcome = await targetQueue.drain();
+    if (_current(version) && outcome.uploadedAny) await refresh();
   }
 
   Future<void> retryItem(int id) async {
-    await queue.retry(id);
+    if (!_bound) return;
+    final version = _bindingVersion;
+    final targetQueue = queue;
+    await targetQueue.retry(id);
+    if (!_current(version)) return;
     await reloadLocal();
-    final outcome = await queue.drain();
-    if (outcome.uploadedAny) await refresh();
+    final outcome = await targetQueue.drain();
+    if (_current(version) && outcome.uploadedAny) await refresh();
   }
 
   void setQuery(String value) {
@@ -193,7 +313,10 @@ class MaterialsController extends ChangeNotifier {
   MaterialView? viewFor(MaterialItem? item) {
     if (item == null) return null;
     final mark = _openMark(item.id);
-    final condition = (mark != null && mark.conditionCode != null && mark.conditionCode!.isNotEmpty)
+    final condition =
+        (mark != null &&
+            mark.conditionCode != null &&
+            mark.conditionCode!.isNotEmpty)
         ? mark.conditionCode
         : item.check?.conditionCode;
     final label = _label(condition) ?? item.check?.label ?? '';
@@ -209,7 +332,11 @@ class MaterialsController extends ChangeNotifier {
       mark: mark,
       localMedia: [
         for (final entry in outbox)
-          if (entry.kind == OutboxKind.media && entry.materialId == item.id && entry.open) entry,
+          if (entry.kind == OutboxKind.media &&
+              entry.checkDate == _date &&
+              entry.materialId == item.id &&
+              entry.open)
+            entry,
       ],
     );
   }
@@ -231,17 +358,25 @@ class MaterialsController extends ChangeNotifier {
   }
 
   Future<void> reloadLocal() async {
-    outbox = await queue.store.all();
+    final version = _bindingVersion;
+    if (!_bound) return;
+    final entries = await queue.store.all();
+    if (!_bound || version != _bindingVersion) return;
+    outbox = entries;
     _notify();
   }
 
   Future<void> _loadCache() async {
     if (day != null) return;
+    final version = _bindingVersion;
     final raw = await queue.store.getMeta('materials_day');
+    if (!_current(version)) return;
     if (raw == null || raw.isEmpty) return;
     try {
       day = MaterialsDay.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } on FormatException {
+      day = null;
+    } on TypeError {
       day = null;
     }
   }
@@ -255,7 +390,12 @@ class MaterialsController extends ChangeNotifier {
 
   OutboxItem? _openMark(int materialId) {
     for (final item in outbox) {
-      if (item.kind == OutboxKind.mark && item.materialId == materialId && item.open) return item;
+      if (item.kind == OutboxKind.mark &&
+          item.checkDate == _date &&
+          item.materialId == materialId &&
+          item.open) {
+        return item;
+      }
     }
     return null;
   }
@@ -278,7 +418,9 @@ class MaterialsController extends ChangeNotifier {
 
   String _line(MaterialItem item, OutboxItem? mark) {
     if (mark != null) {
-      if (mark.status == OutboxStatus.failed) return mark.lastError ?? 'Not saved';
+      if (mark.status == OutboxStatus.failed) {
+        return mark.lastError ?? 'Not saved';
+      }
       if (mark.status == OutboxStatus.uploading) return 'Saving…';
       return 'Saved on this phone';
     }
@@ -312,9 +454,15 @@ class MaterialsController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  bool _current(int version) =>
+      !_disposed && _bound && version == _bindingVersion;
+
   @override
   void dispose() {
     _disposed = true;
+    ++_bindingVersion;
+    _bound = false;
+    queue.paused = true;
     queue.onChanged = null;
     super.dispose();
   }

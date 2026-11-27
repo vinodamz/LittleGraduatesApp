@@ -6,12 +6,23 @@ from pathlib import Path
 
 PACKAGE = 'in.thelittlegraduates.app'
 BASE = f'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PACKAGE}/edits'
+APPLICATION = BASE.removesuffix('/edits')
 
 
 def version_code(value):
     if not value.isdecimal() or not 0 < int(value) <= 2100000000:
         raise argparse.ArgumentTypeError('Version code must be a positive Android integer')
     return str(int(value))
+
+
+def inspect_tracks(session):
+    """Read actual review/publication states without opening or committing an edit."""
+    tracks = {}
+    for track in ['internal', 'production']:
+        response = session.request('GET', f'{APPLICATION}/tracks/{track}/releases', timeout=60)
+        response.raise_for_status()
+        tracks[track] = response.json().get('releases', [])
+    return {'package': PACKAGE, 'tracks': tracks}
 
 
 def release(session, mode, code, bundle=None):
@@ -52,10 +63,13 @@ def release(session, mode, code, bundle=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('mode', choices=['upload', 'promote'])
-    parser.add_argument('--version-code', required=True, type=version_code)
+    parser.add_argument('mode', choices=['upload', 'promote', 'status'])
+    parser.add_argument('--version-code', type=version_code)
     parser.add_argument('--bundle')
+    parser.add_argument('--output', help='Save non-secret release status as JSON')
     args = parser.parse_args()
+    if args.mode != 'status' and not args.version_code:
+        parser.error('--version-code is required for upload or promote')
     if args.mode == 'upload' and not args.bundle:
         parser.error('--bundle is required for upload')
     raw = os.environ.get('PLAY_SERVICE_ACCOUNT_JSON')
@@ -65,6 +79,13 @@ def main():
     from google.auth.transport.requests import AuthorizedSession
     credentials = service_account.Credentials.from_service_account_info(json.loads(raw), scopes=['https://www.googleapis.com/auth/androidpublisher'])
     with AuthorizedSession(credentials) as session:
+        if args.mode == 'status':
+            status = inspect_tracks(session)
+            rendered = json.dumps(status, indent=2)
+            if args.output:
+                Path(args.output).write_text(rendered + '\n')
+            print(rendered)
+            return
         release(session, args.mode, args.version_code, args.bundle)
 
 

@@ -31,6 +31,7 @@ class WorkspaceView extends StatefulWidget {
 class _WorkspaceViewState extends State<WorkspaceView> {
   web.HTMLIFrameElement? _frame;
   late final JSFunction _listener;
+  late final void Function() _back;
 
   @override
   void initState() {
@@ -48,16 +49,17 @@ class _WorkspaceViewState extends State<WorkspaceView> {
       }
     }).toJS;
     web.window.addEventListener('message', _listener);
-    widget.actions.back = () => _frame?.contentWindow?.postMessage(
+    _back = () => _frame?.contentWindow?.postMessage(
       <String, String>{'type': 'lg-workspace-back'}.jsify(),
       Uri.parse(AppConfig.baseUrl).origin.toJS,
     );
+    widget.actions.back = _back;
   }
 
   @override
   void dispose() {
     web.window.removeEventListener('message', _listener);
-    widget.actions.back = null;
+    if (identical(widget.actions.back, _back)) widget.actions.back = null;
     _frame?.src = 'about:blank';
     super.dispose();
   }
@@ -66,6 +68,7 @@ class _WorkspaceViewState extends State<WorkspaceView> {
   Widget build(BuildContext context) => HtmlElementView.fromTagName(
     tagName: 'iframe',
     onElementCreated: (element) {
+      if (!mounted) return;
       final frame = element as web.HTMLIFrameElement;
       _frame = frame;
       frame.title = 'School tool';

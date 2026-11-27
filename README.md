@@ -1,6 +1,13 @@
 # Little Graduates app
 
-Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. A bottom bar keeps Today, Transport, Staff and Materials one tap apart. Other modules open the website.
+Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. Two main tabs keep navigation simple: Today for daily actions and School for all permitted tools. Transport, Staff and Materials open as native screens with a Back button; other tools use the authenticated school workspace.
+
+Today shows attendance, a running trip or the next scheduled run, pending uploads,
+and up to four daily shortcuts. School groups tools into Daily work, Children,
+School office and Administration; search finds tools in collapsed groups too.
+Unknown future modules remain available under Other tools. Grouping never grants
+access: the server still decides which modules a user receives. Transport uses
+Trips, Live map and Tools; team attendance is expandable within Staff.
 
 - **Transport** is the driver trip screen, with live location.
 - **Staff** is check-in, leave and today's roster. Payroll, documents and messages stay on the website.
@@ -35,8 +42,9 @@ lib/
     nav.dart                   bottom-bar tab switch
   features/
     auth/login_screen.dart     pick name, PIN pad
-    shell/app_shell.dart       Today, Transport, Staff, Materials, More
-    home/home_screen.dart      Today and More
+    shell/app_shell.dart       Today and School navigation; native tool routes
+    home/home_screen.dart      Daily actions and searchable school tools
+    home/school_catalog.dart   Permission-preserving groups and daily shortcuts
     transport/                 today's runs, trip screen, location tracker
     staff/                     check-in, leave, roster
     materials/                 daily shelf check, local outbox, background upload
@@ -51,6 +59,42 @@ lib/
 5. The Materials tab and the Today screen show how many items are still on the phone. A failed item has a Retry button.
 
 Apply MTT migration `076` before shipping the app build. Until that column exists, media uploads get a retryable server error instead of a duplicate file.
+
+### Account isolation and backend compatibility
+
+Native materials queues and cached sheets use separate databases and media folders
+for each MTT user. Switching accounts pauses the previous queue; a background job
+uses that queue's own token. Logout clears the active background account. Existing
+unassigned queues from older releases are preserved in `materials_outbox.db` and
+the original media folder, but are not assigned to the next person signing in.
+Recover those files only after confirming the original owner.
+
+Deploy the matching MTT materials API changes before releasing this app: uploads
+with a valid client key can retain dates older than 14 days. Ordinary interactive
+date requests retain the 14-day limit, and future dates remain invalid. Migration
+076 is still required for media deduplication.
+
+The matching MTT module catalog exposes WACRM and n8n subject to existing user
+permissions. LGManagement, LGTaskManager and Kreedo utilities remain independent
+applications; their databases are not automatically shared with MTT.
+
+The School menu also includes My Day, My duties, My leave, Notifications, Money
+overview, Duty lists, Feedback, Surveys, Grades, MCP API and Admin. MTT supplies
+the permitted entries: duties and notifications are available to every signed-in
+user; My leave appears when Staff is unavailable. Administrative tools require
+the admin role. My Day requires Students or Assessment; Money overview requires
+Fees, Expenses or Students. Materials and Weekly Plans use the same module-or-duty
+access helpers as the corresponding MTT pages. The web pages retain their own
+authorization checks. Notification preferences and other detail pages remain
+accessible from their parent tools.
+
+Deploy the matching MTT catalog and workspace URL policy with the Android update.
+The URL policy includes MCP API and accepts the approved n8n directory. Older MTT
+deployments will continue to supply their older, shorter menu.
+
+Offline startup restores the cached user and module list bound to the device
+token. Server permissions remain authoritative for every online request. Trip
+notification payloads contain both trip and stop IDs and open the relevant stop.
 
 ### Adding another MTT module to the app
 

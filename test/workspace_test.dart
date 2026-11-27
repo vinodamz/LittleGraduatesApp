@@ -17,6 +17,8 @@ void main() {
       'plans',
       'daycare',
       'recruitment',
+      'wacrm',
+      'n8n',
     ]) {
       expect(
         moduleOpensInApp(

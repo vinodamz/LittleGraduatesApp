@@ -45,7 +45,7 @@ class MaterialsController extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> rememberToken(String? token) async {
+  Future<void> rememberToken(String? token, {int? userId}) async {
     if (token == null) {
       if (_owner != null) _store.release(_owner!);
       _owner = null;

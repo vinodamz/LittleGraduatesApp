@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -11,6 +12,12 @@ class Notifications {
   static final _taps = StreamController<String>.broadcast();
 
   static Stream<String> get taps => _taps.stream;
+  static String? pending;
+
+  static void receive(String payload) {
+    pending = payload;
+    _taps.add(payload);
+  }
 
   static const _channel = AndroidNotificationDetails(
     'trip_alerts',
@@ -30,9 +37,13 @@ class Notifications {
         linux: LinuxInitializationSettings(defaultActionName: 'Open'),
       ),
       onDidReceiveNotificationResponse: (r) {
-        if (r.payload != null) _taps.add(r.payload!);
+        if (r.payload != null) receive(r.payload!);
       },
     );
+    final launch = await _plugin.getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp == true) {
+      pending = launch?.notificationResponse?.payload;
+    }
   }
 
   static Future<void> requestPermission() async {

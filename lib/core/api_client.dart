@@ -27,7 +27,16 @@ class ApiClient {
       'Mozilla/5.0 (Linux; Android) LittleGraduatesApp/1.0';
 
   final http.Client _http;
-  String? token;
+  String? _token;
+  int _credentialRevision = 0;
+
+  String? get token => _token;
+
+  set token(String? value) {
+    if (_token == value) return;
+    _token = value;
+    ++_credentialRevision;
+  }
 
   /// Called when the server says the token is no longer valid.
   void Function()? onUnauthenticated;
@@ -107,6 +116,10 @@ class ApiClient {
     Future<http.Response> Function() request, {
     Duration timeout = const Duration(seconds: 20),
   }) async {
+    // Headers are captured synchronously when this request starts. An old
+    // response must not invalidate credentials installed while it was pending,
+    // including a sign-out/sign-in cycle that reuses the same token value.
+    final credentialRevision = _credentialRevision;
     http.Response res;
     try {
       res = await request().timeout(timeout);
@@ -135,7 +148,9 @@ class ApiClient {
         status: res.statusCode,
         code: (data['code'] as String?) ?? '',
       );
-      if (e.isUnauthenticated) onUnauthenticated?.call();
+      if (e.isUnauthenticated && credentialRevision == _credentialRevision) {
+        onUnauthenticated?.call();
+      }
       throw e;
     }
     return data;

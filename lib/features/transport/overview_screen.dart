@@ -62,6 +62,7 @@ class _OverviewScreenState extends State<OverviewScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           if (_error != null)
