@@ -51,12 +51,13 @@ Map<String, List<AppModule>> groupSchoolModules(List<AppModule> modules) {
 List<AppModule> dailyShortcuts(List<AppModule> modules) {
   final byKey = {for (final module in modules) module.key: module};
   return [
+    // My Day holds class attendance, a teacher's first job of the day.
     for (final key in [
+      'my_day',
       'duties',
       'materials',
-      'my_day',
-      'tasks',
       'plans',
+      'tasks',
       'my_leave',
       'students',
     ])

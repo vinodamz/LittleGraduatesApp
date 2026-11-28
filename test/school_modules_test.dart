@@ -58,6 +58,7 @@ void main() {
         ).any((module) => ['admin', 'mcp_admin', 'n8n'].contains(module.key)),
         isFalse,
       );
+      expect(dailyShortcuts(input).first.key, 'my_day');
     },
   );
 

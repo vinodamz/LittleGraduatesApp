@@ -107,7 +107,7 @@ class StaffAttendanceCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: TextButton(
                   onPressed: onOpen,
-                  child: const Text('Open staff'),
+                  child: const Text('Attendance & leave'),
                 ),
               ),
           ],

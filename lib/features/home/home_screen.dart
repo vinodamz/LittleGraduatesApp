@@ -17,7 +17,10 @@ import '../transport/location_tracker.dart';
 import '../transport/today_screen.dart';
 import '../transport/transport_api.dart';
 import '../transport/trip_screen.dart';
+import 'class_attendance_screen.dart';
 import 'school_catalog.dart';
+import 'today_api.dart';
+import 'today_cards.dart';
 
 /// The signed-in landing tab: greeting, a live trip, attendance, and the
 /// next runs. Other modules live under More.
@@ -36,6 +39,8 @@ class _TodayScreenState extends State<TodayScreen> {
   bool _staffBusy = false;
   String? _tripError;
   String? _staffError;
+  TodaySummary? _summary;
+  bool _classBusy = false;
 
   bool get _hasTransport =>
       context.read<Session>().modules.any((m) => m.key == 'transport');
@@ -67,9 +72,91 @@ class _TodayScreenState extends State<TodayScreen> {
     }
     if (!mounted) return;
     await Future.wait([
+      _loadSummary(),
       if (_hasTransport) _loadTrips(),
       if (_hasStaff) _loadStaff(),
     ]);
+  }
+
+  /// My class, duties, assessments and the admin glance. Optional: an older
+  /// school server without this endpoint leaves Today as it was.
+  Future<void> _loadSummary() async {
+    try {
+      final summary = await TodayApi(context.read<ApiClient>()).load();
+      if (mounted) setState(() => _summary = summary);
+    } on ApiException {
+      if (mounted) setState(() => _summary = null);
+    }
+  }
+
+  Future<void> _markRestPresent() async {
+    if (_classBusy) return;
+    setState(() => _classBusy = true);
+    try {
+      final next = await TodayApi(context.read<ApiClient>()).markRestPresent();
+      if (!mounted) return;
+      setState(() => _summary = next ?? _summary);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Attendance saved.')));
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _classBusy = false);
+    }
+  }
+
+  Future<void> _openClass() async {
+    final summary = _summary;
+    if (summary == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ClassAttendanceScreen(initial: summary),
+      ),
+    );
+    if (mounted) await _loadSummary();
+  }
+
+  Future<void> _openWeb(String url, String label) async {
+    if (url.isEmpty) return;
+    await openWebUrl(context, url, label);
+    if (mounted) await _loadSummary();
+  }
+
+  List<Widget> _summaryCards(TodaySummary s) {
+    final myClass = s.myClass;
+    return [
+      if (myClass != null && myClass.hasClass)
+        MyClassCard(
+          myClass: myClass,
+          busy: _classBusy,
+          onRestPresent: _markRestPresent,
+          onChange: _openClass,
+        )
+      else if (myClass != null && myClass.canCover)
+        CoverClassCard(
+          onOpen: () => _openWeb(s.links.attendance, 'Class attendance'),
+        ),
+      if (s.dutiesPending > 0 || s.assessmentsPending > 0)
+        TodoCard(
+          dutiesPending: s.dutiesPending,
+          assessmentsPending: s.assessmentsPending,
+          onDuties: () => _openWeb(s.links.duties, 'My duties'),
+          onAssessments: () => _openWeb(s.links.assessment, 'Assessment'),
+        ),
+      if (s.admin != null)
+        AdminGlanceCard(
+          glance: s.admin!,
+          onStaff: () => _hasStaff
+              ? LgNav.maybeOf(context)?.go('staff')
+              : _openWeb(s.links.staffToday, 'Staff today'),
+          onLeave: () => _openWeb(s.links.leaveReview, 'Leave'),
+        ),
+    ];
   }
 
   Future<void> _loadTrips() async {
@@ -233,6 +320,7 @@ class _TodayScreenState extends State<TodayScreen> {
               ),
               const SizedBox(height: 20),
             ],
+            if (_summary != null) ..._summaryCards(_summary!),
             if (shortcuts.isNotEmpty)
               LgSectionTitle(
                 'Daily work',

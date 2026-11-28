@@ -3,7 +3,13 @@
 Android and iOS app (Flutter) for the Little Graduates MTT system. Staff sign in with the same name + PIN as the website. Two main tabs keep navigation simple: Today for daily actions and School for all permitted tools. Transport, Staff and Materials open as native screens with a Back button; other tools use the authenticated school workspace.
 
 Today shows attendance, a running trip or the next scheduled run, pending uploads,
-and up to four daily shortcuts. School groups tools into Daily work, Children,
+and up to four daily shortcuts (My Day first). It also shows what each role needs
+first, from one call to MTT `api/v1/today.php`: My class (mark everyone present in
+one tap, or open the class register where each tap saves), duties and assessments
+still to do, a "Mark class attendance" card for subteachers without a class, and
+who is in plus leave to approve for admins. My Day on the website uses the same
+MTT helpers (`includes/class_attendance.php`), so the two always agree. Older
+servers without that endpoint simply leave these cards out. School groups tools into Daily work, Children,
 School office and Administration; search finds tools in collapsed groups too.
 Unknown future modules remain available under Other tools. Grouping never grants
 access: the server still decides which modules a user receives. Transport uses
