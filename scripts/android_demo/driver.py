@@ -275,17 +275,18 @@ class Demo:
         self.wait("real system photo picker", self.choose_photo, timeout=30)
         self.wait("photo queued after failed foreground attempt", self.queued_photo, timeout=25)
         self.checkpoint("photo-saved-offline")
-        self.shell("input", "keyevent", "KEYCODE_HOME")
-        time.sleep(2)
-        self.shell("am", "kill", "--user", "0", PACKAGE)
-        self.wait("background UI process ended", lambda: not self.shell("pidof", PACKAGE, check=False).strip(), timeout=10)
-        self.event("background-ui-process-ended-no-force-stop")
         self.shell("cmd", "connectivity", "airplane-mode", "disable")
-        # Keep one route while the cold worker starts; simultaneous cellular
+        # Keep one route while the user-started worker starts; cellular
         # and Wi-Fi reconnection can change the default network mid-upload.
         self.shell("svc", "data", "disable")
         self.shell("svc", "wifi", "enable")
         self.event("connectivity-restored-wifi-only")
+        # The prepared foreground attempt has already failed and returned its
+        # claim. Connectivity lets the real queued WorkManager task start while
+        # the user is still in Materials; no job or notification is injected.
+        self.wait("actual DataSync service started while app visible", self.upload_started, timeout=75)
+        self.shell("input", "keyevent", "KEYCODE_HOME")
+        self.event("home-after-actual-service-start")
         self.shell("cmd", "statusbar", "expand-notifications")
         self.wait("actual WorkManager service and visible notification", self.upload_visible, timeout=75)
         self.checkpoint("actual-datasync-notification")
@@ -293,10 +294,7 @@ class Demo:
         self.verify_upload()
         self.shell("cmd", "statusbar", "collapse")
         self.shell("am", "start", "-n", ACTIVITY)
-        # A cold start returns to the app shell; reach the same materials screen.
-        self.tap_label(r"^School(?:\n|$)")
-        self.tap(self.scroll_to(r"^Materials(?:\n|$)"))
-        self.label(re.escape(self.fixture["materials"][0]["name"]))
+        self.wait("Materials screen reopened", self.reopen_materials, timeout=30)
         self.wait("outbox has no unfinished media", lambda: not [r for r in self.queue() if r["kind"] == "media" and r["status"] != "uploaded"])
         self.checkpoint("uploaded-material-reloaded")
         time.sleep(3)
@@ -350,11 +348,27 @@ class Demo:
         self.event("queued-real-photo", bytes=len(content), sha256=self.photo_hash)
         return True
 
-    def upload_visible(self):
+    def service_snapshot(self):
         services = self.shell("dumpsys", "activity", "services", PACKAGE)
         notifications = self.shell("dumpsys", "notification", "--noredact")
         (self.output / "latest-foreground-services.txt").write_text(services)
         (self.output / "latest-notifications.txt").write_text(notifications)
+        return services, notifications
+
+    def upload_started(self):
+        services, notifications = self.service_snapshot()
+        if not foreground_evidence(services, notifications):
+            return False
+        activities = self.shell("dumpsys", "activity", "activities")
+        if not any(PACKAGE in line for line in activities.splitlines() if "mResumedActivity" in line or "topResumedActivity" in line):
+            raise RuntimeError("App must remain visible until the actual DataSync service starts")
+        (self.output / "foreground-start-services.txt").write_text(services)
+        (self.output / "foreground-start-activities.txt").write_text(activities)
+        self.event("actual-datasync-started-with-visible-activity", service=SERVICE, notification_id=71041)
+        return True
+
+    def upload_visible(self):
+        services, notifications = self.service_snapshot()
         if not foreground_evidence(services, notifications):
             return False
         activities = self.shell("dumpsys", "activity", "activities")
@@ -367,6 +381,18 @@ class Demo:
             (self.output / name).write_text(value)
         self.event("actual-foreground-service-visible", service=SERVICE, notification_id=71041)
         return True
+
+    def reopen_materials(self):
+        root = self.tree()
+        if select(root, re.escape(self.fixture["materials"][0]["name"]), package=re.escape(PACKAGE)):
+            return True
+        # The normal warm resume retains Materials. Handle a recreated Activity
+        # through its actual School navigation instead of assuming a cold start.
+        school = select(root, r"^School(?:\n|$)", package=re.escape(PACKAGE))
+        if school:
+            self.tap(school[0])
+            self.tap(self.scroll_to(r"^Materials(?:\n|$)"))
+        return False
 
     def verify_upload(self):
         login = self.api("login.php", {"user_id": self.fixture["user"]["id"], "pin": self.fixture["user"]["pin"], "device_name": "Synthetic demo readback"})
@@ -412,7 +438,8 @@ class Demo:
         summary = (f"# Android DataSync demonstration\n\n{status}\n\n"
                    "Actual unmodified Flutter debug app, API 35 x86_64 emulator, synthetic MTT records in isolated MariaDB. "
                    "No notification injection, video overlays, playback substitution or queue mutation. "
-                   "Radio-off selection, Home, background process termination (not force-stop), reconnect, actual WorkManager upload. "
+                   "Radio-off photo selection, Wi-Fi reconnect while Materials stays visible, verified actual WorkManager DataSync start, then Home and background upload. "
+                   "The process is not killed; this is a visible-user-started service demonstration, not a cold-restart test. "
                    "The fixture delays the real media request by 30 seconds. Video is Android screenrecord output, unedited and silent.\n\n"
                    f"Backend revision: `{self.fixture['mtt_commit']}`. See runner.txt for app revision.\n\n")
         if failure:

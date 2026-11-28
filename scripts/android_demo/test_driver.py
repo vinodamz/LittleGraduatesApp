@@ -66,6 +66,38 @@ class DriverTests(unittest.TestCase):
             self.assertEqual((demo.output / "latest-foreground-services.txt").read_text(), "No foreground services")
             self.assertEqual((demo.output / "latest-notifications.txt").read_text(), "No active notifications")
 
+    def test_service_start_gate_requires_resumed_app_and_real_service(self):
+        demo = Demo.__new__(Demo)
+        services = f"* ServiceRecord{{abc {PACKAGE}/{SERVICE}}}\nisForeground=true foregroundId=71041 types=0x1"
+        notifications = f"NotificationRecord(pkg={PACKAGE} id=71041)"
+        with tempfile.TemporaryDirectory() as folder:
+            demo.output = Path(folder)
+            with patch.object(demo, "shell", side_effect=[services, notifications, f"mResumedActivity: {PACKAGE}/MainActivity"]), \
+                    patch.object(demo, "event"):
+                self.assertTrue(demo.upload_started())
+            with patch.object(demo, "shell", side_effect=[services, notifications, "mResumedActivity: launcher/Home"]):
+                with self.assertRaisesRegex(RuntimeError, "must remain visible"):
+                    demo.upload_started()
+            with patch.object(demo, "shell", side_effect=["No service", notifications]):
+                self.assertFalse(demo.upload_started())
+
+    def test_background_gate_still_rejects_resumed_app(self):
+        demo = Demo.__new__(Demo)
+        services = f"* ServiceRecord{{abc {PACKAGE}/{SERVICE}}}\nisForeground=true foregroundId=71041 types=0x1"
+        with tempfile.TemporaryDirectory() as folder:
+            demo.output = Path(folder)
+            with patch.object(demo, "shell", side_effect=[services, f"NotificationRecord(pkg={PACKAGE} id=71041)", f"topResumedActivity={PACKAGE}/MainActivity"]):
+                with self.assertRaisesRegex(RuntimeError, "resumed while claiming background"):
+                    demo.upload_visible()
+
+    def test_warm_resume_keeps_existing_materials_route(self):
+        demo = Demo.__new__(Demo)
+        demo.fixture = {"materials": [{"name": "Demo Pink Tower"}]}
+        with patch.object(demo, "tree", return_value=tree([{"text": "Demo Pink Tower", "package": PACKAGE}])), \
+                patch.object(demo, "tap") as tap:
+            self.assertTrue(demo.reopen_materials())
+        tap.assert_not_called()
+
     def test_wait_accepts_leaf_xml_node(self):
         demo = Demo.__new__(Demo)
         demo.record_started = None
